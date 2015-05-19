@@ -7,6 +7,9 @@
 #include <QClipboard>
 #include <QTime>
 
+#include <QOpenGLWidget>
+#include <QOpenGLFunctions>
+
 class QTabWidget;
 
 namespace qglviewer {
@@ -15,7 +18,7 @@ class ManipulatedFrame;
 class ManipulatedCameraFrame;
 }
 
-/*! \brief A versatile 3D OpenGL viewer based on QGLWidget.
+/*! \brief A versatile 3D OpenGL viewer based on QOpenGLWidget.
 \class QGLViewer qglviewer.h QGLViewer/qglviewer.h
 
 It features many classical viewer functionalities, such as a camera trackball, manipulated objects,
@@ -37,7 +40,7 @@ callback mechanism). See the <a href="../examples/callback.html">callback exampl
 complete implementation.
 
 \nosubgrouping */
-class QGLVIEWER_EXPORT QGLViewer : public QGLWidget
+class QGLVIEWER_EXPORT QGLViewer : public QOpenGLWidget
 {
 	Q_OBJECT
 
@@ -45,23 +48,13 @@ public:
 	// Complete implementation is provided so that the constructor is defined with QT3_SUPPORT when .h is included.
 	// (Would not be available otherwise since lib is compiled without QT3_SUPPORT).
 #ifdef QT3_SUPPORT
-	explicit QGLViewer(QWidget* parent=NULL, const char* name=0, const QGLWidget* shareWidget=0, Qt::WindowFlags flags=0)
-		: QGLWidget(parent, name, shareWidget, flags)
+    explicit QGLViewer(QWidget* parent=NULL, const char* name=0, Qt::WindowFlags flags=0)
+        : QOpenGLWidget(parent, name, shareWidget, flags)
 	{ defaultConstructor(); }
-
-	explicit QGLViewer(const QGLFormat& format, QWidget* parent=0, const char* name=0, const QGLWidget* shareWidget=0,Qt::WindowFlags flags=0)
-		: QGLWidget(format, parent, name, shareWidget, flags)
-	{ defaultConstructor(); }
-
-	QGLViewer(QGLContext* context, QWidget* parent, const char* name=0, const QGLWidget* shareWidget=0, Qt::WindowFlags flags=0)
-		: QGLWidget(context, parent, name, shareWidget, flags) {
-		defaultConstructor(); }
 
 #else
 
-	explicit QGLViewer(QWidget* parent=0, const QGLWidget* shareWidget=0, Qt::WindowFlags flags=0);
-	explicit QGLViewer(QGLContext *context, QWidget* parent=0, const QGLWidget* shareWidget=0, Qt::WindowFlags flags=0);
-	explicit QGLViewer(const QGLFormat& format, QWidget* parent=0, const QGLWidget* shareWidget=0, Qt::WindowFlags flags=0);
+    explicit QGLViewer(QWidget* parent=0, Qt::WindowFlags flags=0);
 #endif
 
 	virtual ~QGLViewer();
@@ -161,11 +154,15 @@ public:
 public Q_SLOTS:
 	/*! Sets the backgroundColor() of the viewer and calls \c qglClearColor(). See also
 		setForegroundColor(). */
-	void setBackgroundColor(const QColor& color) { backgroundColor_=color; qglClearColor(color); }
+    void setBackgroundColor(const QColor& color) { backgroundColor_=color; gl.glClearColor(color.redF(), color.greenF(), color.blueF(), color.alphaF()); }
 	/*! Sets the foregroundColor() of the viewer, used to draw visual hints. See also setBackgroundColor(). */
 	void setForegroundColor(const QColor& color) { foregroundColor_ = color; }
 	//@}
 
+    /*! @name OpenGL features */
+protected:
+    /*! Gives access to all OpenGL Features for all platforms*/
+    QOpenGLFunctions gl;
 
 	/*! @name Scene dimensions */
 	//@{
@@ -375,27 +372,27 @@ private:
 	/*! @name Useful inherited methods */
 	//@{
 public:
-	/*! Returns viewer's widget width (in pixels). See QGLWidget documentation. */
+    /*! Returns viewer's widget width (in pixels). See QOpenGLWidget documentation. */
 	int width() const;
-	/*! Returns viewer's widget height (in pixels). See QGLWidget documentation. */
+    /*! Returns viewer's widget height (in pixels). See QOpenGLWidget documentation. */
 	int height() const;
-	/*! Updates the display. Do not call draw() directly, use this method instead. See QGLWidget documentation. */
+    /*! Updates the display. Do not call draw() directly, use this method instead. See QOpenGLWidget documentation. */
 	virtual void updateGL();
 	/*! Converts \p image into the unnamed format expected by OpenGL methods such as glTexImage2D().
-	See QGLWidget documentation. */
+    See QOpenGLWidget documentation. */
 	static QImage convertToGLFormat(const QImage & image);
-	/*! Calls \c glColor3. See QGLWidget::qglColor(). */
+    /*! Calls \c glColor3. See QOpenGLWidget::qglColor(). */
 	void qglColor(const QColor& color) const;
-	/*! Calls \c glClearColor. See QGLWidget documentation. */
+    /*! Calls \c glClearColor. See QOpenGLWidget documentation. */
 	void qglClearColor(const QColor& color) const;
-	/*! Returns \c true if the widget has a valid GL rendering context. See QGLWidget
+    /*! Returns \c true if the widget has a valid GL rendering context. See QOpenGLWidget
 	documentation. */
 	bool isValid() const;
-	/*! Returns \c true if display list sharing with another QGLWidget was requested in the
-	constructor. See QGLWidget documentation. */
+    /*! Returns \c true if display list sharing with another QOpenGLWidget was requested in the
+    constructor. See QOpenGLWidget documentation. */
 	bool isSharing() const;
 	/*! Makes this widget's rendering context the current OpenGL rendering context. Useful with
-	several viewers. See QGLWidget documentation. */
+    several viewers. See QOpenGLWidget documentation. */
 	virtual void makeCurrent();
 	/*! Returns \c true if mouseMoveEvent() is called even when no mouse button is pressed.
 
@@ -408,7 +405,7 @@ public Q_SLOTS:
 	/*! Sets the hasMouseTracking() value. */
 	virtual void setMouseTracking(bool enable);
 protected:
-	/*! Returns \c true when buffers are automatically swapped (default). See details in the QGLWidget
+    /*! Returns \c true when buffers are automatically swapped (default). See details in the QOpenGLWidget
 	documentation. */
 	bool autoBufferSwap() const;
 protected Q_SLOTS:
@@ -520,7 +517,7 @@ public:
 	current window. This scaled version will only be used when saveSnapshot() calls your draw() method
 	to generate the snapshot.
 
-	All your calls to QGLWidget::renderText() function hence should use this method.
+    All your calls to QOpenGLWidget::renderText() function hence should use this method.
 	\code
 	renderText(x, y, z, "My Text", scaledFont(QFont()));
 	\endcode
