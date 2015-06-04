@@ -41,6 +41,7 @@
 # include <QDir>
 # include <QUrl>
 #include <QDebug>
+#include <QOpenGLFramebufferObject>
 
 using namespace std;
 using namespace qglviewer;
@@ -3881,4 +3882,106 @@ GLuint QGLViewer::bufferTextureId() const
         return bufferTextureId_;
     else
         return 0;
+}
+
+
+/*! OpenGL ES compatible version of setPivotPointFromPixelGLES. Must be defined here because of a draw to paintGL. */
+bool QGLViewer::setPivotPointFromPixelGLES(std::vector<QOpenGLShaderProgram*> programs, Camera*const camera, const QPoint& pixel)
+{
+    bool found;
+    Vec point = pointUnderPixelGLES(programs, camera, pixel, found);
+    if (found)
+        camera->setPivotPoint(point);
+
+    return found;
+}
+
+
+/*! OpenGL ES version of glReadPixels cannot be used with GL_DEPTH_COMPONENT. In fact, there is no direct way
+ with OpenGL ES to access the depth buffer data. The common workaround is to draw the scene in a grayscale
+ representing the depth value accessible only from the fragment shader. This is why you must provide a vector
+containing all of the programs used to render your scene. The fragment shaders of all these programs is replaced
+ by one drawing in a grayscale, then the scene is rendered in an FBO that will not be displayed, glReadPixels
+reads the color data, which is then converted in  a depth value, and the original fragment shaders are set back up.
+*/
+qglviewer::Vec QGLViewer::pointUnderPixelGLES(std::vector<QOpenGLShaderProgram*> programs, qglviewer::Camera*const camera, const QPoint& pixel, bool& found)
+{
+    makeCurrent();
+    struct data
+    {
+        QByteArray code;
+        int program_index;
+        int shader_index;
+    };
+
+    static const int size = programs.size();
+
+    std::vector<data> original_shaders;
+    //The fragmentertex source code
+    const char grayscale_fragment_source[] =
+    {
+        //"#version 330 \n"
+        "void main(void) { \n"
+        "gl_FragColor = vec4(vec3(gl_FragCoord.z), 1.0); \n"
+        "} \n"
+        "\n"
+    };
+
+
+    for(int i=0; i<size; i++)
+    {
+        for(int j=0; j<programs[i]->shaders().size(); j++)
+        {
+            if(programs[i]->shaders().at(j)->shaderType() == QOpenGLShader::Fragment)
+            {
+                //copies the original shaders of each program
+                data c;
+                c.code = programs[i]->shaders().at(j)->sourceCode();
+                c.program_index = i;
+                c.shader_index = j;
+                original_shaders.push_back(c);
+                //replace their fragment shaders so they display in a grayscale
+                programs[i]->shaders().at(j)->compileSourceCode(grayscale_fragment_source);
+            }
+            programs[i]->link();
+        }
+}
+    //determines the size of the buffer
+    int deviceWidth = camera->screenWidth();
+    int deviceHeight = camera->screenHeight();
+    int rowLength = deviceWidth * 4; // data asked in RGBA,so 4 bytes.
+
+    //the FBO in which the grayscale image will be rendered
+    QOpenGLFramebufferObject *fbo = new QOpenGLFramebufferObject(deviceWidth, deviceHeight);
+    fbo->bind();
+    //make the lines thicker so it is easier to click
+    gl.glLineWidth(10.0);
+    //draws the image in the fbo
+    paintGL();
+    gl.glLineWidth(1.0);
+
+
+
+    const static int dataLength = rowLength * deviceHeight;
+    GLubyte* buffer = new GLubyte[dataLength];
+
+    // Qt uses upper corner for its origin while GL uses the lower corner.
+    gl.glReadPixels(pixel.x(), deviceHeight-1-pixel.y(), 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, buffer);
+    //reset the fbo to the one rendered on-screen, now that we have our information
+    fbo->release();
+    //resets the originals programs
+    for(int i=0; i<original_shaders.size(); i++)
+    {
+        programs[original_shaders[i].program_index]->shaders().at(original_shaders[i].shader_index)->compileSourceCode(original_shaders[i].code);
+        programs[original_shaders[i].program_index]->link();
+    }
+    //depth value needs to be between 0 and 1.
+    float depth = buffer[0]/255.0;
+    qglviewer::Vec point(pixel.x(), pixel.y(), depth);
+    point = camera->unprojectedCoordinatesOf(point);
+
+    //if depth is 1, then it is the zFar plane that is hit, so there is nothing rendered along the ray.
+     found = depth<1;
+
+     return point;
 }

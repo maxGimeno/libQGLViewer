@@ -9,6 +9,7 @@
 
 #include <QOpenGLWidget>
 #include <QOpenGLFunctions>
+#include <QOpenGLShaderProgram>
 
 class QTabWidget;
 
@@ -120,7 +121,8 @@ public Q_SLOTS:
 	void toggleCameraIsEdited() { setCameraIsEdited(!cameraIsEdited()); }
 	//@}
 
-
+    bool setPivotPointFromPixelGLES(std::vector<QOpenGLShaderProgram*> programs, qglviewer::Camera* const camera, const QPoint& pixel);
+    qglviewer::Vec pointUnderPixelGLES(std::vector<QOpenGLShaderProgram*> programs, qglviewer::Camera* const camera, const QPoint& pixel, bool& found);
 	/*! @name Viewer's colors */
 	//@{
 public:
