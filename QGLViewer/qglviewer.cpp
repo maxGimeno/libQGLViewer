@@ -40,6 +40,7 @@
 # include <QImage>
 # include <QDir>
 # include <QUrl>
+#include <QDebug>
 
 using namespace std;
 using namespace qglviewer;
@@ -70,7 +71,8 @@ void QGLViewer::defaultConstructor()
     // Test OpenGL context
     // if (glGetString(GL_VERSION) == 0)
     // qWarning("Unable to get OpenGL version, context may not be available - Check your configuration");
-
+    frame_manipulation = false;
+    setAttribute(Qt::WA_AcceptTouchEvents);
     int poolIndex = QGLViewer::QGLViewerPool_.indexOf(NULL);
     setFocusPolicy(Qt::StrongFocus);
 
@@ -1158,6 +1160,56 @@ void QGLViewer::performClickAction(ClickAction ca, const QMouseEvent* const e)
     }
 }
 
+/*! Overloading the QWidget method.
+
+ When the user touches the screen:
+ if the frame_manipulation flag is set to true, calls the event function of the ManipulatedFrame. Else, calls the function of the ManipulatedCameraFrame.
+ */
+bool QGLViewer::event(QEvent *e)
+{
+    switch(e->type())
+    {
+    case QEvent::TouchBegin:
+    {
+         QMouseEvent* me = (static_cast<QMouseEvent*>(e));
+         mousePressEvent(me);
+
+        if(frame_manipulation)
+            manipulatedFrame_->touchBeginEvent(e, camera());
+        else
+            camera_->frame()->touchBeginEvent(e, camera());
+            break;
+    }
+    case QEvent::TouchUpdate:
+    {
+        QTouchEvent* te = (static_cast<QTouchEvent*>(e));
+        if(te->touchPoints().count()==2 )
+        {
+    if(frame_manipulation)
+        manipulatedFrame_->event(e, camera());
+    else
+        camera_->frame()->event(e, camera());
+        }
+        break;
+    }
+    case QEvent::TouchEnd:
+    {
+         QMouseEvent* me = (static_cast<QMouseEvent*>(e));
+         mouseReleaseEvent(me);
+
+        if(frame_manipulation)
+            manipulatedFrame_->touchEndEvent(e, camera());
+        else
+            camera_->frame()->touchEndEvent(e, camera());
+        break;
+    }
+    default:
+    {
+        QWidget::event(e);
+    }
+    }
+}
+
 /*! Overloading of the \c QWidget method.
 
 When the user clicks on the mouse:
@@ -1212,7 +1264,6 @@ void QGLViewer::mousePressEvent(QMouseEvent* e)
         {
             //#CONNECTION# wheelEvent has the same structure
             const MouseBindingPrivate mbp(e->modifiers(), e->button(), currentlyPressedKey_);
-
             if (mouseBinding_.contains(mbp))
             {
                 MouseActionPrivate map = mouseBinding_[mbp];

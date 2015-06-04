@@ -93,6 +93,9 @@ public:
 	future. */
 	bool cameraIsEdited() const { return cameraIsEdited_; }
 
+        /*! Flag defining if the touch events should move the camera frame or the manipulated frame when running on a touchscreen device.
+        Can be set by a radiobutton for instance. */
+        bool frame_manipulation;
 
 public Q_SLOTS:
 	/*! Sets the state of axisIsDrawn(). Emits the axisIsDrawnChanged() signal. See also toggleAxisIsDrawn(). */
@@ -763,6 +766,7 @@ protected:
 	/*! @name Mouse, keyboard and event handlers */
 	//@{
 protected:
+    virtual bool event(QEvent *e);
 	virtual void mousePressEvent(QMouseEvent *);
 	virtual void mouseMoveEvent(QMouseEvent *);
 	virtual void mouseReleaseEvent(QMouseEvent *);

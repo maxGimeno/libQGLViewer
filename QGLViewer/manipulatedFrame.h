@@ -231,6 +231,11 @@ protected:
 	virtual void wheelEvent           (QWheelEvent* const event, Camera* const camera);
 	//@}
 
+    /*! @name Touch event handler*/
+    virtual bool touchBeginEvent(QEvent *e, Camera* const camera);
+    virtual bool event(QEvent *e, Camera* const camera);
+    virtual bool touchEndEvent(QEvent *e, Camera* const camera);
+
 public:
 	/*! @name Current state */
 	//@{

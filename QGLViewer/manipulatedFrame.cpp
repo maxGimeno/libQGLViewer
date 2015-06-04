@@ -3,7 +3,7 @@
 #include "manipulatedCameraFrame.h"
 #include "qglviewer.h"
 #include "camera.h"
-
+#include<QDebug>
 #include <cstdlib>
 
 #include <QMouseEvent>
@@ -273,7 +273,75 @@ void ManipulatedFrame::zoom(qreal delta, const Camera * const camera) {
 }
 
 #endif // DOXYGEN
+/*! Gives the position of the first TouchEvent as the pressPos_ and prevPos_ like a regular MousePressEvent.*/
 
+bool ManipulatedFrame::touchBeginEvent(QEvent *e, Camera* const camera)
+{
+    QMouseEvent* me = (static_cast<QMouseEvent*>(e));
+    QTouchEvent* te = (static_cast<QTouchEvent*>(e));
+    //mousePressEvent(me);
+    prevPos_=pressPos_=QPoint(te->touchPoints().first().pos().x(),te->touchPoints().first().pos().y()) ;
+    action_ = QGLViewer::ROTATE;
+}
+
+/*! Initiates the ManipulatedFrame touch manipulation.
+
+Overloading of QWidget::mousePressEvent(). See also mouseMoveEvent() and mouseReleaseEvent().
+
+The mouse behavior depends on which button is pressed. See the <a href="../mouse.html">QGLViewer
+mouse page</a> for details.
+  */
+ bool ManipulatedFrame::event(QEvent *e,  Camera* const camera)
+{
+     QTouchEvent* te = (static_cast<QTouchEvent*>(e));
+     QTouchEvent::TouchPoint p0 = te->touchPoints().first();
+     QTouchEvent::TouchPoint p1 = te->touchPoints().last();
+     prevPos_ = pressPos_ = QPoint(p1.pos().x(), p1.pos().y());
+     QLineF line1(p0.lastPos(), p1.lastPos());
+     QLineF line2(p0.pos(), p1.pos());
+     qreal scaling =line1.length()-line2.length();
+     QPointF c1(line1.x1()/2.0+line1.x2()/2.0, line1.y1()/2.0+line1.y2()/2.0);
+     QPointF c2(line2.x1()/2.0+line2.x2()/2.0, line2.y1()/2.0+line2.y2()/2.0);
+     QVector2D translation(c2-c1);
+
+     //Performs  a translation along the X and Y axis
+     Vec trans(-translation.x(), translation.y(), 0);
+     // Scale to fit the screen mouse displacement
+     trans *= 2.0 * tan(camera->fieldOfView()/2.0) * fabs((camera->frame()->coordinatesOf(position())).z) / camera->screenHeight();
+     // Transform to world coordinate system.
+     trans = camera->frame()->orientation().rotate(translationSensitivity()*trans);
+     // And then down to frame
+     if (referenceFrame())
+         trans = referenceFrame()->transformOf(trans);
+     translate(-trans);
+
+     //Performs a translation along the Z axis as a zoom action
+     translate(inverseTransformOf(Vec(0.0, 0.0, 0.2*camera->flySpeed()*2*scaling)));
+
+     //the pivot point position in the screen coordinate system
+     Vec pivot = Vec(line1.x1()/2.0+line1.x2()/2.0,line1.y1()/2.0+line1.y2()/2.0,camera->zNear());
+     //the pivot point position in the World coordinate system
+     pivot = camera->unprojectedCoordinatesOf(pivot);
+
+
+     Vec U= camera->frame()->transformOf(camera->frame()->inverseTransformOf(Vec(0.0, 0.0, -1.0)));
+
+     qreal angle = line2.angleTo(line1)*M_PI/180;
+     qglviewer::Quaternion quaternion;
+     quaternion = Quaternion(U, -2*angle);
+
+     //Performs a rotation around the Z axis and around the pivot point
+     rotateAroundPoint(quaternion, camera->pivotPoint());
+     Q_EMIT manipulated();
+
+
+     return true;
+}
+
+ /*! If an ManipulatedFrame specific TouchEnd event must be implemented, do it here.*/
+ bool ManipulatedFrame::touchEndEvent(QEvent *e, Camera* const camera)
+ {
+ }
 /*! Initiates the ManipulatedFrame mouse manipulation.
 
 Overloading of MouseGrabber::mousePressEvent(). See also mouseMoveEvent() and mouseReleaseEvent().
@@ -289,10 +357,12 @@ void ManipulatedFrame::mousePressEvent(QMouseEvent* const event, Camera* const c
 
 	// #CONNECTION setMouseBinding
 	// action_ should no longer possibly be NO_MOUSE_ACTION since this value is not inserted in mouseBinding_
-	//if (action_ == QGLViewer::NO_MOUSE_ACTION)
-	//event->ignore();
+    //if (action_ == QGLViewer::NO_MOUSE_ACTION)
+    //event->ignore();
 
 	prevPos_ = pressPos_ = event->pos();
+    action_ = QGLViewer::ROTATE;
+
 }
 
 /*! Modifies the ManipulatedFrame according to the mouse motion.
@@ -422,11 +492,11 @@ void ManipulatedFrame::mouseMoveEvent(QMouseEvent* const event, Camera* const ca
 			break;
 	}
 
-	if (action_ != QGLViewer::NO_MOUSE_ACTION)
-	{
+    if (action_ != QGLViewer::NO_MOUSE_ACTION)
+    {
 		prevPos_ = event->pos();
 		Q_EMIT manipulated();
-	}
+    }
 }
 
 /*! Stops the ManipulatedFrame mouse manipulation.
@@ -446,10 +516,10 @@ void ManipulatedFrame::mouseReleaseEvent(QMouseEvent* const event, Camera* const
 	if (previousConstraint_)
 		setConstraint(previousConstraint_);
 
-	if (((action_ == QGLViewer::ROTATE) || (action_ == QGLViewer::SCREEN_ROTATE)) && (mouseSpeed_ >= spinningSensitivity()))
-		startSpinning(delay_);
+    if (((action_ == QGLViewer::ROTATE) || (action_ == QGLViewer::SCREEN_ROTATE)) && (mouseSpeed_ >= spinningSensitivity()))
+        startSpinning(delay_);
 
-	action_ = QGLViewer::NO_MOUSE_ACTION;
+    action_ = QGLViewer::NO_MOUSE_ACTION;
 }
 
 /*! Overloading of MouseGrabber::mouseDoubleClickEvent().

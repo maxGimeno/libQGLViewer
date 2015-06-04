@@ -159,9 +159,11 @@ public:
 protected:
 	virtual void mouseReleaseEvent(QMouseEvent* const event, Camera* const camera);
 	virtual void mouseMoveEvent   (QMouseEvent* const event, Camera* const camera);
-	virtual void wheelEvent       (QWheelEvent* const event, Camera* const camera);
+    virtual void wheelEvent       (QWheelEvent* const event, Camera* const camera);
 	//@}
 
+    /*! @name Touch event handler*/
+    virtual bool event(QEvent *e, Camera* const camera);
 	/*! @name Spinning */
 	//@{
 protected Q_SLOTS:

@@ -1,7 +1,7 @@
 #include "domUtils.h"
 #include "manipulatedCameraFrame.h"
 #include "qglviewer.h"
-
+#include <QDebug>
 #include <QMouseEvent>
 
 using namespace qglviewer;
@@ -204,6 +204,61 @@ void ManipulatedCameraFrame::zoom(qreal delta, const Camera * const camera) {
 
 #endif
 
+
+/*! Initiates the ManipulatedFrame touch manipulation.
+
+Overloading of QWidget::mousePressEvent(). See also mouseMoveEvent() and mouseReleaseEvent().
+
+The mouse behavior depends on which button is pressed. See the <a href="../mouse.html">QGLViewer
+mouse page</a> for details.
+  */
+ bool ManipulatedCameraFrame::event(QEvent *e,  Camera* const camera)
+{
+     QTouchEvent* te = (static_cast<QTouchEvent*>(e));
+     QTouchEvent::TouchPoint p0 = te->touchPoints().first();
+     prevPos_ = pressPos_ = QPoint(p0.pos().x(), p0.pos().y());
+     QTouchEvent::TouchPoint p1 = te->touchPoints().last();
+     QLineF line1(p0.lastPos(), p1.lastPos());
+     QLineF line2(p0.pos(), p1.pos());
+     qreal scaling =line1.length()-line2.length();
+     QPointF c1(line1.x1()/2.0+line1.x2()/2.0, line1.y1()/2.0+line1.y2()/2.0);
+     QPointF c2(line2.x1()/2.0+line2.x2()/2.0, line2.y1()/2.0+line2.y2()/2.0);
+     QVector2D translation(c2-c1);
+
+     //Performs  a translation along the X and Y axis
+     Vec trans(-translation.x(), translation.y(), 0);
+
+    // Scale to fit the screen mouse displacement
+    trans *= 2.0 * tan(camera->fieldOfView()/2.0) *
+            fabs((camera->frame()->coordinatesOf(pivotPoint())).z) / camera->screenHeight();
+
+    translate(inverseTransformOf(translationSensitivity()*trans));
+
+
+
+     //Performs a translation along the Z axis as a zoom action
+     translate(inverseTransformOf(Vec(0.0, 0.0, 0.2*camera->flySpeed()*2*scaling)));
+
+     //the pivot point position in the screen coordinate system
+     Vec pivot = Vec(line1.x1()/2.0+line1.x2()/2.0,line1.y1()/2.0+line1.y2()/2.0,camera->zNear());
+     //the pivot point position in the World coordinate system
+     pivot = camera->unprojectedCoordinatesOf(pivot);
+
+
+     Vec U= transformOf(inverseTransformOf(Vec(0.0, 0.0, -1.0)));
+
+     qreal angle = line2.angleTo(line1)*M_PI/180;
+     qglviewer::Quaternion quaternion;
+     quaternion = Quaternion(U, -2*angle);
+
+     //#CONNECTION# These two methods should go together (spinning detection and activation)
+     setSpinningQuaternion(quaternion);
+     spin();
+     updateSceneUpVector();
+     Q_EMIT manipulated();
+    return true;
+}
+
 /*! Overloading of ManipulatedFrame::mouseMoveEvent().
 
 Motion depends on mouse binding (see <a href="../mouse.html">mouse page</a> for details). The
@@ -214,8 +269,8 @@ void ManipulatedCameraFrame::mouseMoveEvent(QMouseEvent* const event, Camera* co
 	switch (action_)
 	{
 		case QGLViewer::TRANSLATE:
-		{
-			const QPoint delta = prevPos_ - event->pos();
+        {
+            const QPoint delta = prevPos_ - event->pos();
 			Vec trans(delta.x(), -delta.y(), 0.0);
 			// Scale to fit the screen mouse displacement
 			switch (camera->type())
@@ -279,7 +334,7 @@ void ManipulatedCameraFrame::mouseMoveEvent(QMouseEvent* const event, Camera* co
 		}
 
 		case QGLViewer::ROTATE:
-		{
+        {
 			Quaternion rot;
 			if (rotatesAroundUpVector_) {
 				// Multiply by 2.0 to get on average about the same speed as with the deformed ball
@@ -358,14 +413,14 @@ void ManipulatedCameraFrame::mouseMoveEvent(QMouseEvent* const event, Camera* co
 			break;
 	}
 
-	if (action_ != QGLViewer::NO_MOUSE_ACTION)
-	{
+    if (action_ != QGLViewer::NO_MOUSE_ACTION)
+    {
 		prevPos_ = event->pos();
 		if (action_ != QGLViewer::ZOOM_ON_REGION)
 			// ZOOM_ON_REGION should not emit manipulated().
-			// prevPos_ is used to draw rectangle feedback.
+            // prevPos_ is used to draw rectangle feedback.
 			Q_EMIT manipulated();
-	}
+    }
 }
 
 
