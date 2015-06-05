@@ -248,10 +248,99 @@ void QGLViewer::initializeGL()
 
     // Calls user defined method. Default emits a signal.
     init();
+    if(!buffers[0].create() || !buffers[1].create() || !buffers[2].create() || !buffers[3].create()|| !buffers[4].create() || !buffers[5].create())
+        std::cerr<<"VBO Creation FAILED"<<std::endl;
+
+
+    if(!vao[0].create() || !vao[1].create())
+    {
+        std::cerr<<"VAO Creation FAILED"<<std::endl;
+    }
+
+
+    //Vertex source code
+    const char vertex_source[] =
+    {
+        // "#version 330 \n"
+        "attribute highp vec4 vertex;\n"
+        "attribute highp vec3 normal;\n"
+        "attribute highp vec3 colors;\n"
+        "uniform highp mat4 mvp_matrix;\n"
+        "uniform highp mat4 mv_matrix; \n"
+        "varying highp vec4 fP; \n"
+        "varying highp vec3 fN; \n"
+        "varying highp vec4 color; \n"
+        "void main(void)\n"
+        "{\n"
+        "   gl_PointSize = 10.0; \n"
+        "   color = vec4(colors, 1.0); \n"
+        "   fP = mv_matrix * vertex; \n"
+        "   fN = mat3(mv_matrix)* normal; \n"
+        "   gl_Position = mvp_matrix * vertex; \n"
+        "}"
+    };
+    //Fragment source code
+    const char fragment_source[] =
+    {
+        //"#version 330 \n"
+        "varying highp vec4 color; \n"
+        "varying highp vec4 fP; \n"
+        "varying highp vec3 fN; \n"
+        "uniform highp vec4 light_pos;  \n"
+        "uniform highp vec4 light_diff; \n"
+        "uniform highp vec4 light_spec; \n"
+        "uniform highp vec4 light_amb;  \n"
+        "uniform highp float spec_power ; \n"
+
+        "void main(void) { \n"
+
+        "   highp vec3 L = light_pos.xyz - fP.xyz; \n"
+        "   highp vec3 V = -fP.xyz; \n"
+        "   highp vec3 N; \n"
+        "   if(fN == highp vec3(0.0,0.0,0.0)) \n"
+        "       N = highp vec3(0.0,0.0,0.0); \n"
+        "   else \n"
+        "       N = normalize(fN); \n"
+        "   L = normalize(L); \n"
+        "   V = normalize(V); \n"
+        "   highp vec3 R = reflect(-L, N); \n"
+        "   highp vec4 diffuse = max(abs(dot(N,L)),0.0) * light_diff*color; \n"
+        "   highp vec4 specular = pow(max(dot(R,V), 0.0), spec_power) * light_spec; \n"
+
+        "gl_FragColor = color*light_amb + diffuse + specular; \n"
+        "} \n"
+        "\n"
+    };
+    QOpenGLShader *vertex_shader = new QOpenGLShader(QOpenGLShader::Vertex);
+    if(!vertex_shader->compileSourceCode(vertex_source))
+    {
+        std::cerr<<"Compiling vertex source FAILED"<<std::endl;
+    }
+
+    QOpenGLShader *fragment_shader= new QOpenGLShader(QOpenGLShader::Fragment);
+    if(!fragment_shader->compileSourceCode(fragment_source))
+    {
+        std::cerr<<"Compiling fragmentsource FAILED"<<std::endl;
+    }
+
+    if(!rendering_program.addShader(vertex_shader))
+    {
+        std::cerr<<"adding vertex shader FAILED"<<std::endl;
+    }
+    if(!rendering_program.addShader(fragment_shader))
+    {
+        std::cerr<<"adding fragment shader FAILED"<<std::endl;
+    }
+    if(!rendering_program.link())
+    {
+        //std::cerr<<"linking Program FAILED"<<std::endl;
+        qDebug() << rendering_program.log();
+    }
 
     // Give time to glInit to finish and then call setFullScreen().
     if (isFullScreen())
         QTimer::singleShot( 100, this, SLOT(delayedFullScreen()) );
+
 }
 
 /*! Main paint method, inherited from \c QOpenGLWidget.
@@ -273,7 +362,7 @@ void QGLViewer::paintGL()
                 fastDraw();
             else
                 draw();
-            postDraw();
+            postDrawGLES();
         }
     }
     else
@@ -286,7 +375,7 @@ void QGLViewer::paintGL()
         else
             draw();
         // Add visual hints: axis, camera, grid...
-        postDraw();
+        postDrawGLES();
     }
     Q_EMIT drawFinished(true);
 }
@@ -390,6 +479,113 @@ void QGLViewer::postDraw()
     glPopMatrix();*/
 }
 
+void QGLViewer::postDrawGLES()
+{
+    rendering_program.release();
+    QMatrix4x4 mvpMatrix;
+    QMatrix4x4 mvMatrix;
+    float mat[16];
+    camera()->getModelViewProjectionMatrix(mat);
+    for(int i=0; i < 16; i++)
+    {
+        mvpMatrix.data()[i] = (float)mat[i];
+    }
+    camera()->getModelViewMatrix(mat);
+    for(int i=0; i < 16; i++)
+    {
+        mvMatrix.data()[i] = (float)mat[i];
+    }
+
+    QVector4D	position(0.0f,0.0f,1.0f,1.0f );
+    // define material
+    QVector4D	ambient;
+    QVector4D	diffuse;
+    QVector4D	specular;
+    GLfloat      shininess ;
+    // Ambient
+    ambient[0] = 0.29225f;
+    ambient[1] = 0.29225f;
+    ambient[2] = 0.29225f;
+    ambient[3] = 1.0f;
+    // Diffuse
+    diffuse[0] = 0.50754f;
+    diffuse[1] = 0.50754f;
+    diffuse[2] = 0.50754f;
+    diffuse[3] = 1.0f;
+    // Specular
+    specular[0] = 0.0f;
+    specular[1] = 0.0f;
+    specular[2] = 0.0f;
+    specular[3] = 0.0f;
+    // Shininess
+    shininess = 51.2f;
+
+
+    rendering_program.bind();
+    mvpLocation = rendering_program.uniformLocation("mvp_matrix");
+    mvLocation = rendering_program.uniformLocation("mv_matrix");
+    lightLocation[0] = rendering_program.uniformLocation("light_pos");
+    lightLocation[1] = rendering_program.uniformLocation("light_diff");
+    lightLocation[2] = rendering_program.uniformLocation("light_spec");
+    lightLocation[3] = rendering_program.uniformLocation("light_amb");
+    lightLocation[4] = rendering_program.uniformLocation("spec_power");
+    rendering_program.release();
+
+    rendering_program.bind();
+    rendering_program.setUniformValue(lightLocation[0], position);
+    rendering_program.setUniformValue(mvpLocation, mvpMatrix);
+    rendering_program.setUniformValue(mvLocation, mvMatrix);
+    rendering_program.setUniformValue(lightLocation[1], diffuse);
+    rendering_program.setUniformValue(lightLocation[2], specular);
+    rendering_program.setUniformValue(lightLocation[3], ambient);
+    rendering_program.setUniformValue(lightLocation[4], shininess);
+    rendering_program.release();
+    // Pivot point, line when camera rolls, zoom region
+    drawVisualHintsGLES();
+
+  //  if (gridIsDrawn()) { drawGridGLES(camera()->sceneRadius()); }
+     if (axisIsDrawn())
+     {
+        drawAxisGLES(camera()->sceneRadius());
+        rendering_program.bind();
+
+        vao[1].bind();
+        buffers[2].bind();
+        buffers[2].allocate(axisVertices.data(), axisVertices.size()*sizeof(float));
+        vertex_Location = rendering_program.attributeLocation("vertex");
+        rendering_program.enableAttributeArray(vertex_Location);
+        rendering_program.setAttributeBuffer(vertex_Location,GL_FLOAT,0,3);
+        buffers[2].release();
+
+        buffers[3].bind();
+        buffers[3].allocate(axisNormals.data(), axisNormals.size()*sizeof(float));
+        normal_Location = rendering_program.attributeLocation("normal");
+        rendering_program.enableAttributeArray(normal_Location);
+        rendering_program.setAttributeBuffer(normal_Location,GL_FLOAT,0,3);
+        buffers[3].release();
+
+        buffers[4].bind();
+        buffers[4].allocate(axisColors.data(), axisColors.size()*sizeof(float));
+        colors_Location = rendering_program.attributeLocation("colors");
+        rendering_program.enableAttributeArray(colors_Location);
+        rendering_program.setAttributeBuffer(colors_Location,GL_FLOAT,0,3);
+        buffers[4].release();
+
+
+        vao[1].release();
+
+
+
+
+
+        vao[1].bind();
+        rendering_program.bind();
+        glDrawArrays(GL_TRIANGLES, 0, axisVertices.size()/3);
+        rendering_program.release();
+        vao[1].release();
+        //renders a point to show the pivot point
+     }
+}
 /*! Called before draw() (instead of preDraw()) when viewer displaysInStereo().
 
 Same as preDraw() except that the glDrawBuffer() is set to \c GL_BACK_LEFT or \c GL_BACK_RIGHT
@@ -397,6 +593,7 @@ depending on \p leftBuffer, and it uses qglviewer::Camera::loadProjectionMatrixS
 qglviewer::Camera::loadModelViewMatrixStereo() instead. */
 void QGLViewer::preDrawStereo(bool leftBuffer)
 {
+
     // Set buffer to draw in
     // Seems that SGI and Crystal Eyes are not synchronized correctly !
     // That's why we don't draw in the appropriate buffer...
@@ -3213,6 +3410,145 @@ void QGLViewer::drawVisualHints()
     }*/
 }
 
+void QGLViewer::drawVisualHintsGLES()
+{
+
+        // Pivot point cross
+        if (visualHint_ & 1)
+        {
+            const qreal size = 0.05 * sceneRadius();
+
+            pivotVertices[0] = camera()->pivotPoint().x-size;
+            pivotVertices[1] = camera()->pivotPoint().y;
+            pivotVertices[2] = camera()->pivotPoint().z;
+            pivotVertices[3] = camera()->pivotPoint().x+size;
+            pivotVertices[4] = camera()->pivotPoint().y;
+            pivotVertices[5] = camera()->pivotPoint().z;
+
+            pivotVertices[6] = camera()->pivotPoint().x;
+            pivotVertices[7] = camera()->pivotPoint().y-size;
+            pivotVertices[8] = camera()->pivotPoint().z;
+            pivotVertices[9] = camera()->pivotPoint().x;
+            pivotVertices[10] = camera()->pivotPoint().y+size;
+            pivotVertices[11] = camera()->pivotPoint().z;
+
+            pivotNormals[0] = 0;
+            pivotNormals[1] = 0;
+            pivotNormals[2] = 0;
+            pivotNormals[3] = 0;
+            pivotNormals[4] = 0;
+            pivotNormals[5] = 0;
+            pivotNormals[6] = 0;
+            pivotNormals[7] = 0;
+            pivotNormals[8] = 0;
+            pivotNormals[9] = 0;
+            pivotNormals[10] = 0;
+            pivotNormals[11] = 0;
+
+            pivotColors[0] = 1.0;
+            pivotColors[1] = 1.0;
+            pivotColors[2] = 1.0;
+            pivotColors[3] = 1.0;
+            pivotColors[4] = 1.0;
+            pivotColors[5] = 1.0;
+
+            pivotColors[6] = 1.0;
+            pivotColors[7] = 1.0;
+            pivotColors[8] = 1.0;
+            pivotColors[9] = 1.0;
+            pivotColors[10] = 1.0;
+            pivotColors[11] = 1.0;
+
+
+
+            vao[0].bind();
+            buffers[0].bind();
+            buffers[0].allocate(pivotVertices, 12 * sizeof(float));
+            vertex_Location = rendering_program.attributeLocation("vertex");
+            rendering_program.bind();
+            rendering_program.enableAttributeArray(vertex_Location);
+            rendering_program.setAttributeBuffer(vertex_Location,GL_FLOAT,0,3);
+            buffers[0].release();
+
+            buffers[1].bind();
+            buffers[1].allocate(pivotNormals, 12 * sizeof(float));
+            normal_Location = rendering_program.attributeLocation("normal");
+            rendering_program.bind();
+            rendering_program.enableAttributeArray(normal_Location);
+            rendering_program.setAttributeBuffer(normal_Location,GL_FLOAT,0,3);
+            buffers[1].release();
+
+            buffers[5].bind();
+            buffers[5].allocate(pivotColors, 12 * sizeof(float));
+            colors_Location = rendering_program.attributeLocation("colors");
+            rendering_program.bind();
+            rendering_program.enableAttributeArray(colors_Location);
+            rendering_program.setAttributeBuffer(colors_Location,GL_FLOAT,0,3);
+            buffers[5].release();
+
+            rendering_program.release();
+            vao[0].release();
+
+
+            vao[0].bind();
+            rendering_program.bind();
+            gl.glLineWidth(3.0);
+            gl.glDrawArrays(GL_LINES, 0, 4);
+            gl.glLineWidth(1.0);
+            rendering_program.release();
+            vao[0].release();
+        }
+       // if (visualHint_ & 2)
+        // drawText(80, 10, "Play");
+
+        // Screen rotate line
+       /*  ManipulatedFrame* mf = NULL;
+        Vec pnt;
+        if (camera()->frame()->action_ == SCREEN_ROTATE)
+        {
+            mf = camera()->frame();
+            pnt = camera()->pivotPoint();
+        }
+        if (manipulatedFrame() && (manipulatedFrame()->action_ == SCREEN_ROTATE))
+        {
+            mf = manipulatedFrame();
+            // Maybe useful if the mf is a manipCameraFrame...
+            // pnt = manipulatedFrame()->pivotPoint();
+            pnt = manipulatedFrame()->position();
+        }
+
+        if (mf)
+        {
+            pnt = camera()->projectedCoordinatesOf(pnt);
+            startScreenCoordinatesSystem();
+            glDisable(GL_LIGHTING);
+            glDisable(GL_DEPTH_TEST);
+            glLineWidth(3.0);
+            glBegin(GL_LINES);
+            glVertex2d(pnt.x, pnt.y);
+            glVertex2i(mf->prevPos_.x(), mf->prevPos_.y());
+            glEnd();
+            glEnable(GL_DEPTH_TEST);
+            stopScreenCoordinatesSystem();
+        }
+
+        // Zoom on region: draw a rectangle
+        if (camera()->frame()->action_ == ZOOM_ON_REGION)
+        {
+            startScreenCoordinatesSystem();
+            glDisable(GL_LIGHTING);
+            glDisable(GL_DEPTH_TEST);
+            glLineWidth(2.0);
+            glBegin(GL_LINE_LOOP);
+            glVertex2i(camera()->frame()->pressPos_.x(), camera()->frame()->pressPos_.y());
+            glVertex2i(camera()->frame()->prevPos_.x(),  camera()->frame()->pressPos_.y());
+            glVertex2i(camera()->frame()->prevPos_.x(),  camera()->frame()->prevPos_.y());
+            glVertex2i(camera()->frame()->pressPos_.x(), camera()->frame()->prevPos_.y());
+            glEnd();
+            glEnable(GL_DEPTH_TEST);
+            stopScreenCoordinatesSystem();
+        }*/
+}
 /*! Defines the mask that will be used to drawVisualHints(). The only available mask is currently 1,
 corresponding to the display of the qglviewer::Camera::pivotPoint(). resetVisualHints() is
 automatically called after \p delay milliseconds (default is 2 seconds). */
@@ -3270,6 +3606,182 @@ void QGLViewer::drawArrow(const Vec& from, const Vec& to, qreal radius, int nbSu
     glMultMatrixd(Quaternion(Vec(0,0,1), dir).matrix());
     QGLViewer::drawArrow(dir.norm(), radius, nbSubdivisions);
     glPopMatrix();*/
+}
+
+/*! Does the same thing but for OpnGL ES. You need to provide a struct containing a vector of vertices, normals and colors for the arrow.*/
+void QGLViewer::drawArrowGLES(float R, int prec, qglviewer::Vec from, qglviewer::Vec to, qglviewer::Vec color, qglviewer::AxisData &data)
+{
+    qglviewer::Vec temp = to-from;
+    QVector3D dir = QVector3D(temp.x, temp.y, temp.z);
+    QMatrix4x4 mat;
+    mat.setToIdentity();
+    mat.translate(from.x, from.y, from.z);
+    mat.scale(dir.length());
+    dir.normalize();
+    float angle = 0.0;
+    if(std::sqrt((dir.x()*dir.x()+dir.y()*dir.y())) > 1)
+        angle = 90.0f;
+    else
+        angle =acos(dir.y()/std::sqrt(dir.x()*dir.x()+dir.y()*dir.y()+dir.z()*dir.z()))*180.0/M_PI;
+
+    QVector3D axis;
+    axis = QVector3D(dir.z(), 0, -dir.x());
+    mat.rotate(angle, axis);
+
+    //Head
+    for(int d = 0; d<360; d+= 360/prec)
+    {
+        float D = d*M_PI/180.0;
+        float a =std::atan(R/0.33);
+        QVector4D p(0,1.0,0, 1.0);
+        QVector4D n(R*2.0*sin(D), sin(a), R*2.0*cos(D), 1.0);
+        QVector4D pR = mat*p;
+        QVector4D nR = mat*n;
+
+        //point A1
+        data.vertices->push_back(pR.x());
+        data.vertices->push_back(pR.y());
+        data.vertices->push_back(pR.z());
+        data.normals->push_back(nR.x());
+        data.normals->push_back(nR.y());
+        data.normals->push_back(nR.z());
+        data.colors->push_back(color.x);
+        data.colors->push_back(color.y);
+        data.colors->push_back(color.z);
+
+        //point B1
+      //  qDebug()<<"p = "<<p;
+        p = QVector4D(R*2.0* sin(D),0.66,R *2.0* cos(D), 1.0);
+        n = QVector4D(sin(D), sin(a), cos(D), 1.0);
+        pR = mat*p;
+        nR = mat*n;
+//qDebug()<<"pR = "<<pR;
+        data.vertices->push_back(pR.x());
+        data.vertices->push_back(pR.y());
+        data.vertices->push_back(pR.z());
+        data.normals->push_back(nR.x());
+        data.normals->push_back(nR.y());
+        data.normals->push_back(nR.z());
+        data.colors->push_back(color.x);
+        data.colors->push_back(color.y);
+        data.colors->push_back(color.z);
+        //point C1
+        D = (d+360/prec)*M_PI/180.0;
+        p = QVector4D(R*2.0* sin(D),0.66,R *2.0* cos(D), 1.0);
+        n = QVector4D(sin(D), sin(a), cos(D), 1.0);
+        pR = mat*p;
+        nR = mat*n;
+
+        data.vertices->push_back(pR.x());
+        data.vertices->push_back(pR.y());
+        data.vertices->push_back(pR.z());
+        data.normals->push_back(nR.x());
+        data.normals->push_back(nR.y());
+        data.normals->push_back(nR.z());
+        data.colors->push_back(color.x);
+        data.colors->push_back(color.y);
+        data.colors->push_back(color.z);
+
+    }
+
+    //cylinder
+    //body of the cylinder
+    for(int d = 0; d<360; d+= 360/prec)
+    {
+        //point A1
+        float D = d*M_PI/180.0;
+        QVector4D p(R*sin(D),0.66,R*cos(D), 1.0);
+        QVector4D n(sin(D), 0, cos(D), 1.0);
+        QVector4D pR = mat*p;
+        QVector4D nR = mat*n;
+
+        data.vertices->push_back(pR.x());
+        data.vertices->push_back(pR.y());
+        data.vertices->push_back(pR.z());
+        data.normals->push_back(nR.x());
+        data.normals->push_back(nR.y());
+        data.normals->push_back(nR.z());
+        data.colors->push_back(color.x);
+        data.colors->push_back(color.y);
+        data.colors->push_back(color.z);
+        //point B1
+        p = QVector4D(R * sin(D),0,R*cos(D), 1.0);
+        n = QVector4D(sin(D), 0, cos(D), 1.0);
+        pR = mat*p;
+        nR = mat*n;
+
+
+        data.vertices->push_back(pR.x());
+        data.vertices->push_back(pR.y());
+        data.vertices->push_back(pR.z());
+        data.normals->push_back(nR.x());
+        data.normals->push_back(nR.y());
+        data.normals->push_back(nR.z());
+        data.colors->push_back(color.x);
+        data.colors->push_back(color.y);
+        data.colors->push_back(color.z);
+          //point C1
+        D = (d+360/prec)*M_PI/180.0;
+        p = QVector4D(R * sin(D),0,R*cos(D), 1.0);
+        n = QVector4D(sin(D), 0, cos(D), 1.0);
+        pR = mat*p;
+        nR = mat*n;
+        data.vertices->push_back(pR.x());
+        data.vertices->push_back(pR.y());
+        data.vertices->push_back(pR.z());
+        data.normals->push_back(nR.x());
+        data.normals->push_back(nR.y());
+        data.normals->push_back(nR.z());
+        data.colors->push_back(color.x);
+        data.colors->push_back(color.y);
+        data.colors->push_back(color.z);
+        //point A2
+        D = (d+360/prec)*M_PI/180.0;
+
+        p = QVector4D(R * sin(D),0,R*cos(D), 1.0);
+        n = QVector4D(sin(D), 0, cos(D), 1.0);
+        pR = mat*p;
+        nR = mat*n;
+        data.vertices->push_back(pR.x());
+        data.vertices->push_back(pR.y());
+        data.vertices->push_back(pR.z());
+        data.normals->push_back(nR.x());
+        data.normals->push_back(nR.y());
+        data.normals->push_back(nR.z());
+        data.colors->push_back(color.x);
+        data.colors->push_back(color.y);
+        data.colors->push_back(color.z);
+        //point B2
+        p = QVector4D(R * sin(D),0.66,R*cos(D), 1.0);
+        n = QVector4D(sin(D), 0, cos(D), 1.0);
+        pR = mat*p;
+        nR = mat*n;
+        data.vertices->push_back(pR.x());
+        data.vertices->push_back(pR.y());
+        data.vertices->push_back(pR.z());
+        data.normals->push_back(nR.x());
+        data.normals->push_back(nR.y());
+        data.normals->push_back(nR.z());
+        data.colors->push_back(color.x);
+        data.colors->push_back(color.y);
+        data.colors->push_back(color.z);
+        //point C2
+        D = d*M_PI/180.0;
+        p = QVector4D(R * sin(D),0.66,R*cos(D), 1.0);
+        n = QVector4D(sin(D), 0, cos(D), 1.0);
+        pR = mat*p;
+        nR = mat*n;
+        data.vertices->push_back(pR.x());
+        data.vertices->push_back(pR.y());
+        data.vertices->push_back(pR.z());
+        data.normals->push_back(nR.x());
+        data.normals->push_back(nR.y());
+        data.normals->push_back(nR.z());
+        data.colors->push_back(color.x);
+        data.colors->push_back(color.y);
+        data.colors->push_back(color.z);
+
+    }
 }
 
 /*! Draws an XYZ axis, with a given size (default is 1.0).
@@ -3350,6 +3862,33 @@ void QGLViewer::drawAxis(qreal length)
         glEnable(GL_COLOR_MATERIAL);
     if (!lighting)
         glDisable(GL_LIGHTING);*/
+}
+
+/*! Does the same thing but for OpenGL ES.*/
+void QGLViewer::drawAxisGLES(qreal length)
+{
+
+qglviewer::AxisData data;
+    axisVertices.resize(0);
+    axisNormals.resize(0);
+    axisColors.resize(0);
+
+    data.vertices=&axisVertices;
+    data.normals=&axisNormals;
+    data.colors=&axisColors;
+    //float color[4];
+    //color[0] = 0.7f;  color[1] = 0.7f;  color[2] = 1.0f;  color[3] = 1.0f;
+
+    drawArrowGLES(0.01*length, 10, qglviewer::Vec(0,0,0),qglviewer::Vec(length,0,0),qglviewer::Vec(1,0,0),data);
+
+    //color[0] = 1.0f;  color[1] = 0.7f;  color[2] = 0.7f;  color[3] = 1.0f;
+    //QGLViewer::drawArrow(length, 0.01*length);
+    drawArrowGLES(0.01*length, 10, qglviewer::Vec(0,0,0),qglviewer::Vec(0,length,0),qglviewer::Vec(0,1,0),data);
+
+    //color[0] = 0.7f;  color[1] = 1.0f;  color[2] = 0.7f;  color[3] = 1.0f;
+    //QGLViewer::drawArrow(length, 0.01*length);
+    drawArrowGLES(0.01*length, 10, qglviewer::Vec(0,0,0),qglviewer::Vec(0,0,length),qglviewer::Vec(0,0,1),data);
+
 }
 
 /*! Draws a grid in the XY plane, centered on (0,0,0) (defined in the current coordinate system).

@@ -10,6 +10,8 @@
 #include <QOpenGLWidget>
 #include <QOpenGLFunctions>
 #include <QOpenGLShaderProgram>
+#include <QOpenGLBuffer>
+#include <QOpenGLVertexArrayObject>
 
 class QTabWidget;
 
@@ -17,6 +19,12 @@ namespace qglviewer {
 class MouseGrabber;
 class ManipulatedFrame;
 class ManipulatedCameraFrame;
+struct AxisData
+{
+    std::vector<float> *vertices;
+    std::vector<float> *normals;
+    std::vector<float> *colors;
+};
 }
 
 /*! \brief A versatile 3D OpenGL viewer based on QOpenGLWidget.
@@ -168,6 +176,26 @@ public Q_SLOTS:
 protected:
     /*! Gives access to all OpenGL Features for all platforms*/
     QOpenGLFunctions gl;
+
+/*! Data for the shader drawing of scene info */
+    std::vector<float> axisVertices;
+    std::vector<float> axisNormals;
+    std::vector<float> axisColors;
+
+    float pivotVertices[12];
+    float pivotNormals[12];
+    float pivotColors[12];
+
+    QOpenGLBuffer buffers[6];
+    QOpenGLVertexArrayObject vao[2];
+    QOpenGLShaderProgram rendering_program;
+
+    int normal_Location;
+    int vertex_Location;
+    int colors_Location;
+    int mvpLocation;
+    int mvLocation;
+     mutable int lightLocation[5];
 
 	/*! @name Scene dimensions */
 	//@{
@@ -341,16 +369,21 @@ public Q_SLOTS:
 
 private:
 	bool cameraIsInRotateMode() const;
+
 	//@}
 
 
 	/*! @name Display methods */
 	//@{
 public:
+
 	static void drawArrow(qreal length=1.0, qreal radius=-1.0, int nbSubdivisions=12);
 	static void drawArrow(const qglviewer::Vec& from, const qglviewer::Vec& to, qreal radius=-1.0, int nbSubdivisions=12);
+    static void drawArrowGLES(float R, int prec, qglviewer::Vec from, qglviewer::Vec to, qglviewer::Vec color, qglviewer::AxisData &data);
 	static void drawAxis(qreal length=1.0);
+    void drawAxisGLES(qreal length);
 	static void drawGrid(qreal size=1.0, int nbSubdivisions=10);
+    static void drawGridGLES(qreal size=1.0, int nbSubdivisions=10);
 
 	virtual void startScreenCoordinatesSystem(bool upward=false) const;
 	virtual void stopScreenCoordinatesSystem() const;
@@ -763,6 +796,7 @@ protected:
 	virtual void draw() {}
 	virtual void fastDraw();
 	virtual void postDraw();
+    virtual void postDrawGLES();
 	//@}
 
 	/*! @name Mouse, keyboard and event handlers */
@@ -1082,6 +1116,7 @@ public:
 public:
 	virtual void setVisualHintsMask(int mask, int delay = 2000);
 	virtual void drawVisualHints();
+    virtual void drawVisualHintsGLES();
 
 public Q_SLOTS:
 	virtual void resetVisualHints();
