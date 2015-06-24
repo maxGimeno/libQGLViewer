@@ -395,7 +395,7 @@ camera()->loadModelViewMatrix();
 Emits the drawNeeded() signal once this is done (see the <a href="../examples/callback.html">callback example</a>). */
 void QGLViewer::preDraw()
 {
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    gl->glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     // GL_PROJECTION matrix
     camera()->loadProjectionMatrix();
