@@ -227,6 +227,8 @@ If you port an existing application to QGLViewer and your display changes, you p
 disable these flags in init() to get back to a standard OpenGL state. */
 void QGLViewer::initializeGL()
 {
+    gl = QOpenGLContext::currentContext()->functions();
+    gl->initializeOpenGLFunctions();
     //glEnable(GL_LIGHT0);
     //glEnable(GL_LIGHTING);
     glEnable(GL_DEPTH_TEST);
@@ -3519,9 +3521,9 @@ void QGLViewer::drawVisualHintsGLES()
 
             vao[0].bind();
             rendering_program.bind();
-            gl.glLineWidth(3.0);
-            gl.glDrawArrays(GL_LINES, 0, 4);
-            gl.glLineWidth(1.0);
+            gl->glLineWidth(3.0);
+            gl->glDrawArrays(GL_LINES, 0, 4);
+            gl->glLineWidth(1.0);
             rendering_program.release();
             vao[0].release();
         }
@@ -4562,10 +4564,10 @@ qglviewer::Vec QGLViewer::pointUnderPixelGLES(std::vector<QOpenGLShaderProgram*>
     QOpenGLFramebufferObject *fbo = new QOpenGLFramebufferObject(deviceWidth, deviceHeight);
     fbo->bind();
     //make the lines thicker so it is easier to click
-    gl.glLineWidth(10.0);
+    gl->glLineWidth(10.0);
     //draws the image in the fbo
     paintGL();
-    gl.glLineWidth(1.0);
+    gl->glLineWidth(1.0);
 
 
 
@@ -4573,7 +4575,7 @@ qglviewer::Vec QGLViewer::pointUnderPixelGLES(std::vector<QOpenGLShaderProgram*>
     GLubyte* buffer = new GLubyte[dataLength];
 
     // Qt uses upper corner for its origin while GL uses the lower corner.
-    gl.glReadPixels(pixel.x(), deviceHeight-1-pixel.y(), 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, buffer);
+    gl->glReadPixels(pixel.x(), deviceHeight-1-pixel.y(), 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, buffer);
     //reset the fbo to the one rendered on-screen, now that we have our information
     fbo->release();
     //resets the originals programs

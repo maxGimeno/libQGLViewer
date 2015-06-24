@@ -167,7 +167,7 @@ public:
 public Q_SLOTS:
 	/*! Sets the backgroundColor() of the viewer and calls \c qglClearColor(). See also
 		setForegroundColor(). */
-    void setBackgroundColor(const QColor& color) { backgroundColor_=color; gl.glClearColor(color.redF(), color.greenF(), color.blueF(), color.alphaF()); }
+    void setBackgroundColor(const QColor& color) { backgroundColor_=color; gl->glClearColor(color.redF(), color.greenF(), color.blueF(), color.alphaF()); }
 	/*! Sets the foregroundColor() of the viewer, used to draw visual hints. See also setBackgroundColor(). */
 	void setForegroundColor(const QColor& color) { foregroundColor_ = color; }
 	//@}
@@ -175,7 +175,7 @@ public Q_SLOTS:
     /*! @name OpenGL features */
 protected:
     /*! Gives access to all OpenGL Features for all platforms*/
-    QOpenGLFunctions gl;
+    QOpenGLFunctions *gl;
 
 /*! Data for the shader drawing of scene info */
     std::vector<float> axisVertices;
