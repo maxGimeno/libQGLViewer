@@ -311,6 +311,7 @@ public Q_SLOTS:
     void setPivotPoint(const Vec& point);
     bool setPivotPointFromPixel(const QPoint& pixel);
 
+
 public:
     Vec pivotPoint() const;
 
@@ -403,6 +404,7 @@ public:
     void getUnprojectedCoordinatesOf(const qreal src[3], qreal res[3], const Frame* frame=NULL) const;
     void convertClickToLine(const QPoint& pixel, Vec& orig, Vec& dir) const;
     Vec pointUnderPixel(const QPoint& pixel, bool& found) const;
+
     //@}
 
 

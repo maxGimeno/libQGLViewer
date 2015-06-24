@@ -182,12 +182,16 @@ protected:
     std::vector<float> axisNormals;
     std::vector<float> axisColors;
 
+    std::vector<float> gridVertices;
+    std::vector<float> gridNormals;
+    std::vector<float> gridColors;
+
     float pivotVertices[12];
     float pivotNormals[12];
     float pivotColors[12];
 
-    QOpenGLBuffer buffers[6];
-    QOpenGLVertexArrayObject vao[2];
+    QOpenGLBuffer buffers[9];
+    QOpenGLVertexArrayObject vao[3];
     QOpenGLShaderProgram rendering_program;
 
     int normal_Location;
@@ -382,8 +386,8 @@ public:
     static void drawArrowGLES(float R, int prec, qglviewer::Vec from, qglviewer::Vec to, qglviewer::Vec color, qglviewer::AxisData &data);
 	static void drawAxis(qreal length=1.0);
     void drawAxisGLES(qreal length);
-	static void drawGrid(qreal size=1.0, int nbSubdivisions=10);
-    static void drawGridGLES(qreal size=1.0, int nbSubdivisions=10);
+    static void drawGrid(qreal size=1.0, int nbSubdivisions=10);
+    void drawGridGLES(qreal size, int nbSubdivisions, qglviewer::AxisData &data);
 
 	virtual void startScreenCoordinatesSystem(bool upward=false) const;
 	virtual void stopScreenCoordinatesSystem() const;
@@ -1129,6 +1133,12 @@ private Q_SLOTS:
 	void hideMessage();
 
 private:
+    struct data
+    {
+        QByteArray code;
+        int program_index;
+        int shader_index;
+    };
 	// Copy constructor and operator= are declared private and undefined
 	// Prevents everyone from trying to use them
 	QGLViewer(const QGLViewer& v);

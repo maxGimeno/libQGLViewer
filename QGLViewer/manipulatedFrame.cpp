@@ -277,9 +277,7 @@ void ManipulatedFrame::zoom(qreal delta, const Camera * const camera) {
 
 bool ManipulatedFrame::touchBeginEvent(QEvent *e, Camera* const camera)
 {
-    QMouseEvent* me = (static_cast<QMouseEvent*>(e));
     QTouchEvent* te = (static_cast<QTouchEvent*>(e));
-    //mousePressEvent(me);
     prevPos_=pressPos_=QPoint(te->touchPoints().first().pos().x(),te->touchPoints().first().pos().y()) ;
     action_ = QGLViewer::ROTATE;
 }

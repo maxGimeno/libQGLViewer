@@ -25,6 +25,7 @@
 #include "qglviewer.h"
 #include "manipulatedCameraFrame.h"
 
+
 using namespace std;
 using namespace qglviewer;
 
@@ -955,6 +956,7 @@ Vec Camera::pointUnderPixel(const QPoint& pixel, bool& found) const
     point = unprojectedCoordinatesOf(point);
     return point;
 }
+
 
 /*! Moves the Camera so that the entire scene is visible.
 

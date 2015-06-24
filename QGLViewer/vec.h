@@ -361,6 +361,7 @@ public:
 #endif
 };
 
+
 } // namespace
 
 std::ostream& operator<<(std::ostream& o, const qglviewer::Vec&);

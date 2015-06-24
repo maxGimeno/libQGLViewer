@@ -54,11 +54,11 @@
 //#else
 # include <GLES2/gl2.h>
 //#endif
-#define GLdouble GLfloat
+//#define GLdouble GLfloat
 namespace vrender
 {
     typedef double FLOAT ;
-    typedef GLdouble GLFLOAT ;
+    typedef GLfloat GLFLOAT ;
 
 #ifdef A_VOIR
     typedef T_Vect3<double> DVector3 ;

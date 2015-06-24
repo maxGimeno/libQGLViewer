@@ -25,7 +25,8 @@
 #include "camera.h"
 #include "keyFrameInterpolator.h"
 #include "manipulatedCameraFrame.h"
-
+#include <cmath>
+#include <vector>
 # include <QtAlgorithms>
 # include <QTextEdit>
 # include <QApplication>
@@ -248,14 +249,13 @@ void QGLViewer::initializeGL()
 
     // Calls user defined method. Default emits a signal.
     init();
-    if(!buffers[0].create() || !buffers[1].create() || !buffers[2].create() || !buffers[3].create()|| !buffers[4].create() || !buffers[5].create())
-        std::cerr<<"VBO Creation FAILED"<<std::endl;
+    for(int i=0; i<9; i++)
+        if(!buffers[i].create())
+            std::cerr<<"VBO Creation FAILED"<<std::endl;
 
-
-    if(!vao[0].create() || !vao[1].create())
-    {
-        std::cerr<<"VAO Creation FAILED"<<std::endl;
-    }
+    for (int i=0; i<3; i++)
+        if(!vao[i].create())
+            std::cerr<<"VAO Creation FAILED"<<std::endl;
 
 
     //Vertex source code
@@ -543,7 +543,41 @@ void QGLViewer::postDrawGLES()
     // Pivot point, line when camera rolls, zoom region
     drawVisualHintsGLES();
 
-  //  if (gridIsDrawn()) { drawGridGLES(camera()->sceneRadius()); }
+    if (gridIsDrawn())
+    {
+        qglviewer::AxisData data;
+        data.vertices = &gridVertices;
+        data.normals = &gridNormals;
+        data.colors = &gridColors;
+        drawGridGLES(camera()->sceneRadius(), 10, data);
+        rendering_program.bind();
+
+        vao[2].bind();
+        buffers[6].bind();
+        buffers[6].allocate(gridVertices.data(), gridVertices.size()*sizeof(float));
+        vertex_Location = rendering_program.attributeLocation("vertex");
+        rendering_program.enableAttributeArray(vertex_Location);
+        rendering_program.setAttributeBuffer(vertex_Location,GL_FLOAT,0,3);
+        buffers[6].release();
+
+        buffers[7].bind();
+        buffers[7].allocate(gridNormals.data(), gridNormals.size()*sizeof(float));
+        normal_Location = rendering_program.attributeLocation("normal");
+        rendering_program.enableAttributeArray(normal_Location);
+        rendering_program.setAttributeBuffer(normal_Location,GL_FLOAT,0,3);
+        buffers[7].release();
+
+        buffers[8].bind();
+        buffers[8].allocate(gridColors.data(), gridColors.size()*sizeof(float));
+        colors_Location = rendering_program.attributeLocation("colors");
+        rendering_program.enableAttributeArray(colors_Location);
+        rendering_program.setAttributeBuffer(colors_Location,GL_FLOAT,0,3);
+        buffers[8].release();
+
+        glDrawArrays(GL_LINES, 0, gridVertices.size()/3);
+        rendering_program.release();
+        vao[2].release();
+    }
      if (axisIsDrawn())
      {
         drawAxisGLES(camera()->sceneRadius());
@@ -571,14 +605,6 @@ void QGLViewer::postDrawGLES()
         rendering_program.setAttributeBuffer(colors_Location,GL_FLOAT,0,3);
         buffers[4].release();
 
-
-        vao[1].release();
-
-
-
-
-
-        vao[1].bind();
         rendering_program.bind();
         glDrawArrays(GL_TRIANGLES, 0, axisVertices.size()/3);
         rendering_program.release();
@@ -1198,7 +1224,7 @@ endSelection() if you want to use a more complex select buffer structure. */
 void QGLViewer::beginSelection(const QPoint& point)
 {
     // Make OpenGL context current (may be needed with several viewers ?)
-    /*makeCurrent();
+   /* makeCurrent();
 
     // Prepare the selection mode
     glSelectBuffer(selectBufferSize(), selectBuffer());
@@ -1369,8 +1395,8 @@ bool QGLViewer::event(QEvent *e)
     {
     case QEvent::TouchBegin:
     {
-         QMouseEvent* me = (static_cast<QMouseEvent*>(e));
-         mousePressEvent(me);
+        QMouseEvent* me = (static_cast<QMouseEvent*>(e));
+        mousePressEvent(me);
 
         if(frame_manipulation)
             manipulatedFrame_->touchBeginEvent(e, camera());
@@ -1392,10 +1418,11 @@ bool QGLViewer::event(QEvent *e)
     }
     case QEvent::TouchEnd:
     {
-         QMouseEvent* me = (static_cast<QMouseEvent*>(e));
-         mouseReleaseEvent(me);
+        QMouseEvent* me = (static_cast<QMouseEvent*>(e));
+        mouseReleaseEvent(me);
 
-        if(frame_manipulation)
+       if(frame_manipulation)
+       if(frame_manipulation)
             manipulatedFrame_->touchEndEvent(e, camera());
         else
             camera_->frame()->touchEndEvent(e, camera());
@@ -3919,6 +3946,51 @@ void QGLViewer::drawGrid(qreal size, int nbSubdivisions)
         glEnable(GL_LIGHTING);*/
 }
 
+void QGLViewer::drawGridGLES(qreal size, int nbSubdivisions, qglviewer::AxisData &data)
+{
+    data.vertices->resize(0);
+    data.normals->resize(0);
+    data.colors->resize(0);
+    float x = (2*(float)size)/nbSubdivisions;
+    float y = (2*(float)size)/nbSubdivisions;
+    for(int u = 0; u < nbSubdivisions + 1 ; u++)
+    {
+
+        data.vertices->push_back(-(float)size + x* u);
+        data.vertices->push_back(-(float)size);
+        data.vertices->push_back(0.0);
+
+        data.vertices->push_back(-(float)size + x* u);
+        data.vertices->push_back((float)size);
+        data.vertices->push_back(0.0);
+    }
+    for(int v=0; v<nbSubdivisions + 1; v++)
+    {
+
+        data.vertices->push_back(-(float)size);
+        data.vertices->push_back(-(float)size + v * y);
+        data.vertices->push_back(0.0);
+
+        data.vertices->push_back((float)size);
+        data.vertices->push_back(-(float)size + v * y);
+        data.vertices->push_back(0.0);
+    }
+    //color is white but with the normals set to 0, the lighting will make it dark gray.
+    float colors[3];
+    colors[0] = 1.0;
+    colors[1] = 1.0;
+    colors[2] = 1.0;
+
+    for(int i=0; i< 2*2*(nbSubdivisions + 1)*3; i++)
+    {
+        data.colors->push_back(colors[i%3]);
+        data.normals->push_back(0);
+    }
+
+
+
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 //       S t a t i c    m e t h o d s   :  Q G L V i e w e r   P o o l        //
 ////////////////////////////////////////////////////////////////////////////////
@@ -4443,15 +4515,11 @@ containing all of the programs used to render your scene. The fragment shaders o
  by one drawing in a grayscale, then the scene is rendered in an FBO that will not be displayed, glReadPixels
 reads the color data, which is then converted in  a depth value, and the original fragment shaders are set back up.
 */
+
 qglviewer::Vec QGLViewer::pointUnderPixelGLES(std::vector<QOpenGLShaderProgram*> programs, qglviewer::Camera*const camera, const QPoint& pixel, bool& found)
 {
     makeCurrent();
-    struct data
-    {
-        QByteArray code;
-        int program_index;
-        int shader_index;
-    };
+
 
     static const int size = programs.size();
 
