@@ -12,6 +12,7 @@
 #include <QOpenGLShaderProgram>
 #include <QOpenGLBuffer>
 #include <QOpenGLVertexArrayObject>
+#include <QOpenGLFramebufferObject>
 
 class QTabWidget;
 
@@ -105,6 +106,7 @@ public:
         /*! Flag defining if the touch events should move the camera frame or the manipulated frame when running on a touchscreen device.
         Can be set by a radiobutton for instance. */
         bool frame_manipulation;
+        bool selection_mode;
 
 public Q_SLOTS:
 	/*! Sets the state of axisIsDrawn(). Emits the axisIsDrawnChanged() signal. See also toggleAxisIsDrawn(). */
@@ -878,12 +880,13 @@ public Q_SLOTS:
 	void setSelectedName(int id) { selectedObjectId_=id; }
 
 protected:
-	virtual void beginSelection(const QPoint& point);
+    virtual void beginSelection();
 	/*! This method is called by select() and should draw selectable entities.
 
 	Default implementation is empty. Overload and draw the different elements of your scene you want
-	to be able to select. The default select() implementation relies on the \c GL_SELECT, and requires
-	that each selectable element is drawn within a \c glPushName() - \c glPopName() block. A typical
+    to be able to select. The default implementation of select relies on a color-based picking. DrawWithNames
+    should render the scene using a unique color for each item corresponding to its ID. Use glReadPixel to get
+    the color where you click/press and convert it back to the corresponding ID.A typical
 	usage would be (see the <a href="../examples/select.html">select example</a>):
 \code
 void Viewer::drawWithNames() {
@@ -901,8 +904,8 @@ void Viewer::drawWithNames() {
 
 	\attention If your selected objects are points, do not use \c glBegin(GL_POINTS); and \c glVertex3fv()
 	in the above \c draw() method (not compatible with raster mode): use \c glRasterPos3fv() instead. */
-	virtual void drawWithNames() {}
-	virtual void endSelection(const QPoint& point);
+    virtual void drawWithNames(const QPoint& point) {Q_UNUSED(point);}
+    virtual void endSelection();
 	/*! This method is called at the end of the select() procedure. It should finalize the selection
 	process and update the data structure/interface/computation/display... according to the newly
 	selected entity.
@@ -1143,7 +1146,7 @@ private:
 	// Prevents everyone from trying to use them
 	QGLViewer(const QGLViewer& v);
 	QGLViewer& operator=(const QGLViewer& v);
-
+    QOpenGLFramebufferObject *fbo ;
 	// Set parameters to their default values. Called by the constructors.
 	void defaultConstructor();
 

@@ -42,7 +42,6 @@
 # include <QDir>
 # include <QUrl>
 #include <QDebug>
-#include <QOpenGLFramebufferObject>
 
 using namespace std;
 using namespace qglviewer;
@@ -74,6 +73,7 @@ void QGLViewer::defaultConstructor()
     // if (glGetString(GL_VERSION) == 0)
     // qWarning("Unable to get OpenGL version, context may not be available - Check your configuration");
     frame_manipulation = false;
+    selection_mode = false;
     setAttribute(Qt::WA_AcceptTouchEvents);
     int poolIndex = QGLViewer::QGLViewerPool_.indexOf(NULL);
     setFocusPolicy(Qt::StrongFocus);
@@ -620,7 +620,7 @@ void QGLViewer::postDrawGLES()
 Same as preDraw() except that the glDrawBuffer() is set to \c GL_BACK_LEFT or \c GL_BACK_RIGHT
 depending on \p leftBuffer, and it uses qglviewer::Camera::loadProjectionMatrixStereo() and
 qglviewer::Camera::loadModelViewMatrixStereo() instead. */
-void QGLViewer::preDrawStereo(bool leftBuffer)
+void QGLViewer::preDrawStereo(bool /*leftBuffer*/)
 {
 
     // Set buffer to draw in
@@ -867,7 +867,7 @@ See the <a href="../examples/drawLight.html">drawLight example</a> for an illust
 
 \attention You need to enable \c GL_COLOR_MATERIAL before calling this method. \c glColor is set to
 the light diffuse color. */
-void QGLViewer::drawLight(GLenum light, qreal scale) const
+void QGLViewer::drawLight(GLenum /*light*/, qreal /*scale*/) const
 {
 /*	static GLUquadric* quadric = gluNewQuadric();
 
@@ -952,7 +952,7 @@ The \c GL_MODELVIEW and \c GL_PROJECTION matrices are not modified by this metho
 2000 by default (see the QOpenGLWidget::renderText() documentation). If you use more than 2000 Display
 Lists, they may overlap with these. Directly use QOpenGLWidget::renderText() in that case, with a
 higher \c listBase parameter (or overload <code>fontDisplayListBase</code>).*/
-void QGLViewer::drawText(int x, int y, const QString& text, const QFont& fnt)
+void QGLViewer::drawText(int /*x*/, int /*y*/, const QString& /*text*/, const QFont& /*fnt*/)
 {
     //renderText() does not exist anymore
   /*  if (!textIsEnabled())
@@ -1039,7 +1039,7 @@ near clipping plane and 1.0 being just beyond the far clipping plane). This inte
 values that can be read from the z-buffer. Note that if you use the convenient \c glVertex2i() to
 provide coordinates, the implicit 0.0 z coordinate will make your drawings appear \e on \e top of
 the rest of the scene. */
-void QGLViewer::startScreenCoordinatesSystem(bool upward) const
+void QGLViewer::startScreenCoordinatesSystem(bool/* upward*/) const
 {
 /*	glMatrixMode(GL_PROJECTION);
     glPushMatrix();
@@ -1207,110 +1207,34 @@ perform an analytical intersection.
 culling. If you encounter problems try to \c glDisable(GL_CULL_FACE). */
 void QGLViewer::select(const QPoint& point)
 {
-    beginSelection(point);
-    drawWithNames();
-    endSelection(point);
+    makeCurrent();
+    beginSelection();
+    drawWithNames(point);
+    endSelection();
     postSelection(point);
 }
 
 /*! This method should prepare the selection. It is called by select() before drawWithNames().
 
-The default implementation uses the \c GL_SELECT mode to perform a selection. It uses
-selectBuffer() and selectBufferSize() to define a \c glSelectBuffer(). The \c GL_PROJECTION is then
-set using \c gluPickMatrix(), with a window selection size defined by selectRegionWidth() and
-selectRegionHeight(). Finally, the \c GL_MODELVIEW matrix is set to the world coordinate system
-using qglviewer::Camera::loadModelViewMatrix(). See the gluPickMatrix() documentation for details.
-
-You should not need to redefine this method (if you use the \c GL_SELECT mode to perform your
-selection), since this code is fairly classical and can be tuned. You are more likely to overload
-endSelection() if you want to use a more complex select buffer structure. */
-void QGLViewer::beginSelection(const QPoint& point)
+The default implementation uses an FBO in witch drawWithName should render. This FBO is used so
+ that the specific draw from drawwithname is not rendered.
+ */
+void QGLViewer::beginSelection()
 {
-    // Make OpenGL context current (may be needed with several viewers ?)
-   /* makeCurrent();
-
-    // Prepare the selection mode
-    glSelectBuffer(selectBufferSize(), selectBuffer());
-    glRenderMode(GL_SELECT);
-    glInitNames();
-
-    // Loads the matrices
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    static GLint viewport[4];
-    camera()->getViewport(viewport);
-    gluPickMatrix(point.x(), point.y(), selectRegionWidth(), selectRegionHeight(), viewport);
-
-    // loadProjectionMatrix() first resets the GL_PROJECTION matrix with a glLoadIdentity().
-    // The false parameter prevents this and hence multiplies the matrices.
-    camera()->loadProjectionMatrix(false);
-    // Reset the original (world coordinates) modelview matrix
-    camera()->loadModelViewMatrix();*/
+    int deviceWidth = camera()->screenWidth();
+    int deviceHeight = camera()->screenHeight();
+        fbo = new QOpenGLFramebufferObject(deviceWidth, deviceHeight,QOpenGLFramebufferObject::Depth);
+        fbo->bind();
+        gl->glEnable(GL_DEPTH_TEST);
+        gl->glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }
 
-/*! This method is called by select() after scene elements were drawn by drawWithNames(). It should
-analyze the selection result to determine which object is actually selected.
-
-The default implementation relies on \c GL_SELECT mode (see beginSelection()). It assumes that
-names were pushed and popped in drawWithNames(), and analyzes the selectBuffer() to find the name
-that corresponds to the closer (z min) object. It then setSelectedName() to this value, or to -1 if
-the selectBuffer() is empty (no object drawn in selection region). Use selectedName() (probably in
-the postSelection() method) to retrieve this value and update your data structure accordingly.
-
-This default implementation, although sufficient for many cases is however limited and you may have
-to overload this method. This will be the case if drawWithNames() uses several push levels in the
-name heap. A more precise depth selection, for instance privileging points over edges and
-triangles to avoid z precision problems, will also require an overloading. A typical implementation
-will look like:
-\code
-glFlush();
-
-// Get the number of objects that were seen through the pick matrix frustum.
-// Resets GL_RENDER mode.
-GLint nbHits = glRenderMode(GL_RENDER);
-
-if (nbHits <= 0)
-setSelectedName(-1);
-else
+/*! This method is called by select() after scene elements were drawn by drawWithNames(). It simply
+ releases the FBO once drawWithNames is over. */
+void QGLViewer::endSelection()
 {
-// Interpret results: each object created values in the selectBuffer().
-// See the glSelectBuffer() man page for details on the buffer structure.
-// The following code depends on your selectBuffer() structure.
-for (int i=0; i<nbHits; ++i)
-if ((selectBuffer())[i*4+1] < zMin)
-setSelectedName((selectBuffer())[i*4+3])
-}
-\endcode
-
-See the <a href="../examples/multiSelect.html">multiSelect example</a> for
-a multi-object selection implementation of this method. */
-void QGLViewer::endSelection(const QPoint& point)
-{
-    /*Q_UNUSED(point);
-
-    // Flush GL buffers
-    glFlush();
-
-    // Get the number of objects that were seen through the pick matrix frustum. Reset GL_RENDER mode.
-    GLint nbHits = glRenderMode(GL_RENDER);
-
-    if (nbHits <= 0)
-        setSelectedName(-1);
-    else
-    {
-        // Interpret results: each object created 4 values in the selectBuffer().
-        // selectBuffer[4*i+1] is the object minimum depth value, while selectBuffer[4*i+3] is the id pushed on the stack.
-        // Of all the objects that were projected in the pick region, we select the closest one (zMin comparison).
-        // This code needs to be modified if you use several stack levels. See glSelectBuffer() man page.
-        GLuint zMin = (selectBuffer())[1];
-        setSelectedName(int((selectBuffer())[3]));
-        for (int i=1; i<nbHits; ++i)
-            if ((selectBuffer())[4*i+1] < zMin)
-            {
-                zMin = (selectBuffer())[4*i+1];
-                setSelectedName(int((selectBuffer())[4*i+3]));
-            }
-    }*/
+    fbo->release();
+    delete fbo;
 }
 
 /*! Sets the selectBufferSize().
@@ -1339,51 +1263,51 @@ void QGLViewer::performClickAction(ClickAction ca, const QMouseEvent* const e)
     // Note: action that need it should call update().
     switch (ca)
     {
-        // # CONNECTION setMouseBinding prevents adding NO_CLICK_ACTION in clickBinding_
-        // This case should hence not be possible. Prevents unused case warning.
-        case NO_CLICK_ACTION :
-            break;
-        case ZOOM_ON_PIXEL :
-            camera()->interpolateToZoomOnPixel(e->pos());
-            break;
-        case ZOOM_TO_FIT :
-            camera()->interpolateToFitScene();
-            break;
-        case SELECT :
-            select(e);
-            update();
-            break;
-        case RAP_FROM_PIXEL :
-            if (! camera()->setPivotPointFromPixel(e->pos()))
-                camera()->setPivotPoint(sceneCenter());
-            setVisualHintsMask(1);
-            update();
-            break;
-        case RAP_IS_CENTER :
+    // # CONNECTION setMouseBinding prevents adding NO_CLICK_ACTION in clickBinding_
+    // This case should hence not be possible. Prevents unused case warning.
+    case NO_CLICK_ACTION :
+        break;
+    case ZOOM_ON_PIXEL :
+        camera()->interpolateToZoomOnPixel(e->pos());
+        break;
+    case ZOOM_TO_FIT :
+        camera()->interpolateToFitScene();
+        break;
+    case SELECT :
+        select(e);
+        update();
+        break;
+    case RAP_FROM_PIXEL :
+        if (! camera()->setPivotPointFromPixel(e->pos()))
             camera()->setPivotPoint(sceneCenter());
-            setVisualHintsMask(1);
-            update();
-            break;
-        case CENTER_FRAME :
-            if (manipulatedFrame())
-                manipulatedFrame()->projectOnLine(camera()->position(), camera()->viewDirection());
-            break;
-        case CENTER_SCENE :
-            camera()->centerScene();
-            break;
-        case SHOW_ENTIRE_SCENE :
-            camera()->showEntireScene();
-            break;
-        case ALIGN_FRAME :
-            if (manipulatedFrame())
-                manipulatedFrame()->alignWithFrame(camera()->frame());
-            break;
-        case ALIGN_CAMERA :
-            Frame * frame = new Frame();
-            frame->setTranslation(camera()->pivotPoint());
-            camera()->frame()->alignWithFrame(frame, true);
-            delete frame;
-            break;
+        setVisualHintsMask(1);
+        update();
+        break;
+    case RAP_IS_CENTER :
+        camera()->setPivotPoint(sceneCenter());
+        setVisualHintsMask(1);
+        update();
+        break;
+    case CENTER_FRAME :
+        if (manipulatedFrame())
+            manipulatedFrame()->projectOnLine(camera()->position(), camera()->viewDirection());
+        break;
+    case CENTER_SCENE :
+        camera()->centerScene();
+        break;
+    case SHOW_ENTIRE_SCENE :
+        camera()->showEntireScene();
+        break;
+    case ALIGN_FRAME :
+        if (manipulatedFrame())
+            manipulatedFrame()->alignWithFrame(camera()->frame());
+        break;
+    case ALIGN_CAMERA :
+        Frame * frame = new Frame();
+        frame->setTranslation(camera()->pivotPoint());
+        camera()->frame()->alignWithFrame(frame, true);
+        delete frame;
+        break;
     }
 }
 
@@ -1399,23 +1323,27 @@ bool QGLViewer::event(QEvent *e)
     case QEvent::TouchBegin:
     {
         QMouseEvent* me = (static_cast<QMouseEvent*>(e));
-        mousePressEvent(me);
-
-        if(frame_manipulation)
+            mousePressEvent(me);
+        if(selection_mode)
+        {
+            QTouchEvent* te = (static_cast<QTouchEvent*>(e));
+            select(te->touchPoints().first().pos().toPoint());
+        }
+        else if(frame_manipulation)
             manipulatedFrame_->touchBeginEvent(e, camera());
         else
             camera_->frame()->touchBeginEvent(e, camera());
-            break;
+        break;
     }
     case QEvent::TouchUpdate:
     {
         QTouchEvent* te = (static_cast<QTouchEvent*>(e));
         if(te->touchPoints().count()==2 )
         {
-    if(frame_manipulation)
-        manipulatedFrame_->event(e, camera());
-    else
-        camera_->frame()->event(e, camera());
+            if(frame_manipulation)
+                manipulatedFrame_->event(e, camera());
+            else
+                camera_->frame()->event(e, camera());
         }
         break;
     }
@@ -1424,8 +1352,7 @@ bool QGLViewer::event(QEvent *e)
         QMouseEvent* me = (static_cast<QMouseEvent*>(e));
         mouseReleaseEvent(me);
 
-       if(frame_manipulation)
-       if(frame_manipulation)
+        if(frame_manipulation)
             manipulatedFrame_->touchEndEvent(e, camera());
         else
             camera_->frame()->touchEndEvent(e, camera());
@@ -1436,6 +1363,7 @@ bool QGLViewer::event(QEvent *e)
         QWidget::event(e);
     }
     }
+    return 0;
 }
 
 /*! Overloading of the \c QWidget method.
@@ -1458,6 +1386,7 @@ void QGLViewer::mousePressEvent(QMouseEvent* e)
 {
     //#CONNECTION# mouseDoubleClickEvent has the same structure
     //#CONNECTION# mouseString() concatenates bindings description in inverse order.
+
     ClickBindingPrivate cbp(e->modifiers(), e->button(), false, (Qt::MouseButtons)(e->buttons() & ~(e->button())), currentlyPressedKey_);
 
     if (clickBinding_.contains(cbp)) {
@@ -1497,25 +1426,25 @@ void QGLViewer::mousePressEvent(QMouseEvent* e)
                 MouseActionPrivate map = mouseBinding_[mbp];
                 switch (map.handler)
                 {
-                    case CAMERA :
-                        camera()->frame()->startAction(map.action, map.withConstraint);
-                        camera()->frame()->mousePressEvent(e, camera());
-                        break;
-                    case FRAME :
-                        if (manipulatedFrame())
+                case CAMERA :
+                    camera()->frame()->startAction(map.action, map.withConstraint);
+                    camera()->frame()->mousePressEvent(e, camera());
+                    break;
+                case FRAME :
+                    if (manipulatedFrame())
+                    {
+                        if (manipulatedFrameIsACamera_)
                         {
-                            if (manipulatedFrameIsACamera_)
-                            {
-                                manipulatedFrame()->ManipulatedFrame::startAction(map.action, map.withConstraint);
-                                manipulatedFrame()->ManipulatedFrame::mousePressEvent(e, camera());
-                            }
-                            else
-                            {
-                                manipulatedFrame()->startAction(map.action, map.withConstraint);
-                                manipulatedFrame()->mousePressEvent(e, camera());
-                            }
+                            manipulatedFrame()->ManipulatedFrame::startAction(map.action, map.withConstraint);
+                            manipulatedFrame()->ManipulatedFrame::mousePressEvent(e, camera());
                         }
-                        break;
+                        else
+                        {
+                            manipulatedFrame()->startAction(map.action, map.withConstraint);
+                            manipulatedFrame()->mousePressEvent(e, camera());
+                        }
+                    }
+                    break;
                 }
                 if (map.action == SCREEN_ROTATE)
                     // Display visual hint line
@@ -1560,53 +1489,60 @@ else
 \endcode */
 void QGLViewer::mouseMoveEvent(QMouseEvent* e)
 {
-    if (mouseGrabber())
+    if(selection_mode)
     {
-        mouseGrabber()->checkIfGrabsMouse(e->x(), e->y(), camera());
-        if (mouseGrabber()->grabsMouse())
-            if (mouseGrabberIsAManipulatedCameraFrame_)
-                (dynamic_cast<ManipulatedFrame*>(mouseGrabber()))->ManipulatedFrame::mouseMoveEvent(e, camera());
-            else
-                mouseGrabber()->mouseMoveEvent(e, camera());
-        else
-            setMouseGrabber(NULL);
-        update();
-    }
 
-    if (!mouseGrabber())
+    }
+    else
     {
-        //#CONNECTION# mouseReleaseEvent has the same structure
-        if (camera()->frame()->isManipulated())
+        if (mouseGrabber())
         {
-            camera()->frame()->mouseMoveEvent(e, camera());
-            // #CONNECTION# manipulatedCameraFrame::mouseMoveEvent specific if at the beginning
-            if (camera()->frame()->action_ == ZOOM_ON_REGION)
-                update();
-        }
-        else // !
-            if ((manipulatedFrame()) && (manipulatedFrame()->isManipulated()))
-                if (manipulatedFrameIsACamera_)
-                    manipulatedFrame()->ManipulatedFrame::mouseMoveEvent(e, camera());
+            mouseGrabber()->checkIfGrabsMouse(e->x(), e->y(), camera());
+            if (mouseGrabber()->grabsMouse())
+                if (mouseGrabberIsAManipulatedCameraFrame_)
+                    (dynamic_cast<ManipulatedFrame*>(mouseGrabber()))->ManipulatedFrame::mouseMoveEvent(e, camera());
                 else
-                    manipulatedFrame()->mouseMoveEvent(e, camera());
+                    mouseGrabber()->mouseMoveEvent(e, camera());
             else
-                if (hasMouseTracking())
-                {
-                    Q_FOREACH (MouseGrabber* mg, MouseGrabber::MouseGrabberPool())
+                setMouseGrabber(NULL);
+            update();
+        }
+
+        if (!mouseGrabber())
+        {
+            //#CONNECTION# mouseReleaseEvent has the same structure
+            if (camera()->frame()->isManipulated())
+            {
+                camera()->frame()->mouseMoveEvent(e, camera());
+                // #CONNECTION# manipulatedCameraFrame::mouseMoveEvent specific if at the beginning
+                if (camera()->frame()->action_ == ZOOM_ON_REGION)
+                    update();
+            }
+            else // !
+                if ((manipulatedFrame()) && (manipulatedFrame()->isManipulated()))
+                    if (manipulatedFrameIsACamera_)
+                        manipulatedFrame()->ManipulatedFrame::mouseMoveEvent(e, camera());
+                    else
+                        manipulatedFrame()->mouseMoveEvent(e, camera());
+                else
+                    if (hasMouseTracking())
                     {
-                        mg->checkIfGrabsMouse(e->x(), e->y(), camera());
-                        if (mg->grabsMouse())
+                        Q_FOREACH (MouseGrabber* mg, MouseGrabber::MouseGrabberPool())
                         {
-                            setMouseGrabber(mg);
-                            // Check that MouseGrabber is not disabled
-                            if (mouseGrabber() == mg)
+                            mg->checkIfGrabsMouse(e->x(), e->y(), camera());
+                            if (mg->grabsMouse())
                             {
-                                update();
-                                break;
+                                setMouseGrabber(mg);
+                                // Check that MouseGrabber is not disabled
+                                if (mouseGrabber() == mg)
+                                {
+                                    update();
+                                    break;
+                                }
                             }
                         }
                     }
-                }
+        }
     }
 }
 
@@ -1737,7 +1673,7 @@ void QGLViewer::mouseDoubleClickEvent(QMouseEvent* e)
 
 First checks that the display is able to handle stereovision using QOpenGLWidget::format(). Opens a
 warning message box in case of failure. Emits the stereoChanged() signal otherwise. */
-void QGLViewer::setStereoDisplay(bool stereo)
+void QGLViewer::setStereoDisplay(bool /*stereo*/)
 {
 /*	if (format().stereo())
     {
@@ -3608,7 +3544,7 @@ Use drawArrow(const Vec& from, const Vec& to, qreal radius, int nbSubdivisions) 
 ModelView matrix to place the arrow in 3D.
 
 Uses current color and does not modify the OpenGL state. */
-void QGLViewer::drawArrow(qreal length, qreal radius, int nbSubdivisions)
+void QGLViewer::drawArrow(qreal /*length*/, qreal /*radius*/, int /*nbSubdivisions*/)
 {
 /*	static GLUquadric* quadric = gluNewQuadric();
 
@@ -3628,7 +3564,7 @@ void QGLViewer::drawArrow(qreal length, qreal radius, int nbSubdivisions)
 current ModelView coordinates system.
 
 See drawArrow(qreal length, qreal radius, int nbSubdivisions) for details. */
-void QGLViewer::drawArrow(const Vec& from, const Vec& to, qreal radius, int nbSubdivisions)
+void QGLViewer::drawArrow(const Vec& /*from*/, const Vec& /*to*/, qreal /*radius*/, int /*nbSubdivisions*/)
 {
     /*glPushMatrix();
     glTranslatef(float(from[0]), float(from[1]), float(from[2]));
@@ -3832,7 +3768,7 @@ the three arrows. The OpenGL state is not modified by this method.
 
 axisIsDrawn() uses this method to draw a representation of the world coordinate system. See also
 QGLViewer::drawArrow() and QGLViewer::drawGrid(). */
-void QGLViewer::drawAxis(qreal length)
+void QGLViewer::drawAxis(qreal /*length*/)
 {
 /*	const qreal charWidth = length / 40.0;
     const qreal charHeight = length / 30.0;
@@ -3927,7 +3863,7 @@ qglviewer::AxisData data;
 place and orientate the grid in 3D space (see the drawAxis() documentation).
 
 The OpenGL state is not modified by this method. */
-void QGLViewer::drawGrid(qreal size, int nbSubdivisions)
+void QGLViewer::drawGrid(qreal /*size*/, int /*nbSubdivisions*/)
 {
     /*GLboolean lighting;
     glGetBooleanv(GL_LIGHTING, &lighting);
@@ -4523,7 +4459,6 @@ qglviewer::Vec QGLViewer::pointUnderPixelGLES(std::vector<QOpenGLShaderProgram*>
 {
     makeCurrent();
 
-
     static const int size = programs.size();
 
     std::vector<data> original_shaders;
@@ -4536,7 +4471,6 @@ qglviewer::Vec QGLViewer::pointUnderPixelGLES(std::vector<QOpenGLShaderProgram*>
         "} \n"
         "\n"
     };
-
 
     for(int i=0; i<size; i++)
     {
@@ -4560,7 +4494,6 @@ qglviewer::Vec QGLViewer::pointUnderPixelGLES(std::vector<QOpenGLShaderProgram*>
     int deviceWidth = camera->screenWidth();
     int deviceHeight = camera->screenHeight();
     int rowLength = deviceWidth * 4; // data asked in RGBA,so 4 bytes.
-
     //the FBO in which the grayscale image will be rendered
     QOpenGLFramebufferObject *fbo = new QOpenGLFramebufferObject(deviceWidth, deviceHeight);
     fbo->bind();
@@ -4569,29 +4502,25 @@ qglviewer::Vec QGLViewer::pointUnderPixelGLES(std::vector<QOpenGLShaderProgram*>
     //draws the image in the fbo
     paintGL();
     gl->glLineWidth(1.0);
-
-
-
     const static int dataLength = rowLength * deviceHeight;
     GLubyte* buffer = new GLubyte[dataLength];
-
     // Qt uses upper corner for its origin while GL uses the lower corner.
     gl->glReadPixels(pixel.x(), deviceHeight-1-pixel.y(), 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, buffer);
     //reset the fbo to the one rendered on-screen, now that we have our information
     fbo->release();
+    delete fbo;
     //resets the originals programs
-    for(int i=0; i<original_shaders.size(); i++)
+    for(int i=0; i<(int)original_shaders.size(); i++)
     {
         programs[original_shaders[i].program_index]->shaders().at(original_shaders[i].shader_index)->compileSourceCode(original_shaders[i].code);
         programs[original_shaders[i].program_index]->link();
     }
     //depth value needs to be between 0 and 1.
     float depth = buffer[0]/255.0;
+    delete buffer;
     qglviewer::Vec point(pixel.x(), pixel.y(), depth);
     point = camera->unprojectedCoordinatesOf(point);
-
     //if depth is 1, then it is the zFar plane that is hit, so there is nothing rendered along the ray.
      found = depth<1;
-
      return point;
 }
