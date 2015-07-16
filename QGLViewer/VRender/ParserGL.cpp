@@ -87,6 +87,7 @@ void ParserGL::parseFeedbackBuffer(	GLfloat *buffer,int size,
                                                 std::vector<PtrPrimitive>& primitive_tab,
                                                 VRenderParams& vparams)
 {
+    Q_UNUSED(buffer); Q_UNUSED(size); Q_UNUSED(primitive_tab); Q_UNUSED(vparams);
     /*int token;
     int nvertices = 0 ;
     nb_lines = 0 ;
@@ -261,6 +262,7 @@ void ParserUtils::print3DcolorVertex(GLint size, GLint * count, GLfloat * buffer
 
 void ParserUtils::debug_printBuffer(GLint size, GLfloat * buffer)
 {
+    Q_UNUSED(size); Q_UNUSED(buffer);
     /*GLint count;
     int token, nvertices;
 
@@ -301,6 +303,7 @@ void ParserUtils::debug_printBuffer(GLint size, GLfloat * buffer)
 
 void ParserUtils::NormalizePrimitiveCoordinates(GLfloat * & loc,GLfloat MaxSize,GLfloat zmin,GLfloat zmax)
 {
+    Q_UNUSED(loc); Q_UNUSED(MaxSize); Q_UNUSED(zmin); Q_UNUSED(zmax);
     /*int token;
     int nvertices, i;
 
@@ -316,7 +319,7 @@ void ParserUtils::NormalizePrimitiveCoordinates(GLfloat * & loc,GLfloat MaxSize,
                 for (i = 0; i < 2; i++)
                     (loc+size*i)[2] = ((loc+size*i)[2] - zmin)/(zmax-zmin)*MaxSize ;
 
-                loc += 2*size;          /* Each vertex element in the feedback buffer is size GLfloats. */
+                loc += 2*size; */         /* Each vertex element in the feedback buffer is size GLfloats. */
         /*		break;
             }
         case GL_POLYGON_TOKEN:
@@ -327,17 +330,17 @@ void ParserUtils::NormalizePrimitiveCoordinates(GLfloat * & loc,GLfloat MaxSize,
                 for (i = 0; i < nvertices; i++)
                     (loc+size*i)[2] = ((loc+size*i)[2] - zmin)/(zmax-zmin)*MaxSize ;
 
-                loc += nvertices * size;  /* Each vertex element in the feedback buffer is size GLfloats. */
+                loc += nvertices * size;*/  /* Each vertex element in the feedback buffer is size GLfloats. */
         /*		break;
             }
         case GL_POINT_TOKEN:
             {
                 loc[2] = (loc[2] - zmin)/(zmax-zmin)*MaxSize ;
 
-                loc += size;           /* Each vertex element in the feedback buffer is size GLfloats. */
+                loc += size; */          /* Each vertex element in the feedback buffer is size GLfloats. */
     /*			break;
             }
-        default:
+        default:*/
             /* XXX Left as an excersie to the reader. */
 /*#ifdef DEBUGEPSRENDER
             printf("%s (%d) not handled yet. Sorry.\n", ParserUtils::nameOfToken(token), token);
@@ -348,6 +351,7 @@ void ParserUtils::NormalizePrimitiveCoordinates(GLfloat * & loc,GLfloat MaxSize,
 
 void ParserUtils::ComputePrimitiveBB(GLfloat * & loc,GLfloat & xmin,GLfloat & xmax,GLfloat & ymin,GLfloat & ymax, GLfloat & zmin,GLfloat & zmax)
 {
+    Q_UNUSED(loc); Q_UNUSED(xmin); Q_UNUSED(xmax); Q_UNUSED(ymin); Q_UNUSED(ymax);Q_UNUSED(zmin); Q_UNUSED(zmax);
     /*int token;
     int nvertices, i;
 
@@ -372,7 +376,7 @@ void ParserUtils::ComputePrimitiveBB(GLfloat * & loc,GLfloat & xmin,GLfloat & xm
                     if(f.z() > zmax) zmax = GLfloat(f.z()) ;
                 }
 
-                loc += 2*size;          /* Each vertex element in the feedback
+                loc += 2*size;     */     /* Each vertex element in the feedback
                                                     buffer is size GLfloats. */
         /*		break;
             }
@@ -393,7 +397,7 @@ void ParserUtils::ComputePrimitiveBB(GLfloat * & loc,GLfloat & xmin,GLfloat & xm
                     if(f.z() > zmax) zmax = GLfloat(f.z()) ;
                 }
 
-                loc += nvertices * size;  /* Each vertex element in the
+                loc += nvertices * size;*/  /* Each vertex element in the
                                                       feedback buffer is size GLfloats. */
         /*		break;
             }
@@ -408,11 +412,11 @@ void ParserUtils::ComputePrimitiveBB(GLfloat * & loc,GLfloat & xmin,GLfloat & xm
                 if(f.y() > ymax) ymax = GLfloat(f.y()) ;
                 if(f.z() > zmax) zmax = GLfloat(f.z()) ;
 
-                loc += size;           /* Each vertex element in the feedback
+                loc += size;       */    /* Each vertex element in the feedback
                                                   buffer is size GLfloats. */
     /*			break;
             }
-        default:
+        default:*/
             /* XXX Left as an excersie to the reader. */
 /*#ifdef DEBUGEPSRENDER
             printf("Incomplete implementation.  Unexpected token (%d).\n", token);
@@ -464,6 +468,8 @@ typedef struct _DepthIndex {
 
 const char *ParserUtils::nameOfToken(int token)
 {
+    Q_UNUSED(token);
+    return "(Unidentified token)" ;
 /*	switch(token)
     {
         case GL_PASS_THROUGH_TOKEN: 	return "GL_PASS_THROUGH_TOKEN" ;
@@ -477,5 +483,7 @@ const char *ParserUtils::nameOfToken(int token)
         default:
                                                 return "(Unidentified token)" ;
     }*/
+
+
 }
 

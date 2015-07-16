@@ -463,6 +463,7 @@ void Camera::computeModelViewMatrix() const
  QGLWidget::makeCurrent() before this method in order to activate the right OpenGL context. */
 void Camera::loadProjectionMatrix(bool reset) const
 {
+    Q_UNUSED(reset);
 /*	// WARNING: makeCurrent must be called by every calling method
     glMatrixMode(GL_PROJECTION);
 
@@ -500,6 +501,7 @@ void Camera::loadProjectionMatrix(bool reset) const
  QGLWidget::makeCurrent() before this method in order to activate the right OpenGL context. */
 void Camera::loadModelViewMatrix(bool reset) const
 {
+    Q_UNUSED(reset);
     // WARNING: makeCurrent must be called by every calling method
 /*	glMatrixMode(GL_MODELVIEW);
     computeModelViewMatrix();
@@ -536,6 +538,7 @@ void Camera::loadModelViewMatrix(bool reset) const
  \attention glMatrixMode is set to \c GL_PROJECTION. */
 void Camera::loadProjectionMatrixStereo(bool leftBuffer) const
 {
+    Q_UNUSED(leftBuffer);
     /*qreal left, right, bottom, top;
     qreal screenHalfWidth, halfWidth, side, shift, delta;
 
@@ -591,6 +594,7 @@ void Camera::loadProjectionMatrixStereo(bool leftBuffer) const
  \attention glMatrixMode is set to \c GL_MODELVIEW. */
 void Camera::loadModelViewMatrixStereo(bool leftBuffer) const
 {
+    Q_UNUSED(leftBuffer);
     /*// WARNING: makeCurrent must be called by every calling method
     glMatrixMode(GL_MODELVIEW);
 
@@ -2264,6 +2268,7 @@ The Camera is then correctly positioned and orientated.
 artefacts due to numerical imprecisions. */
 void Camera::draw(bool drawFarPlane, qreal scale) const
 {
+    Q_UNUSED(drawFarPlane); Q_UNUSED(scale);
 /*	glPushMatrix();
     glMultMatrixd(frame()->worldMatrix());
 

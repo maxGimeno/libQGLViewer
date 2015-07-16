@@ -257,6 +257,7 @@ void KeyFrameInterpolator::deletePath()
 
 static void drawCamera(qreal scale)
 {
+    Q_UNUSED(scale);
 /*	glDisable(GL_LIGHTING);
 
     const qreal halfHeight = scale * 0.07;
@@ -336,6 +337,7 @@ static void drawCamera(qreal scale)
   \endcode */
 void KeyFrameInterpolator::drawPath(int mask, int nbFrames, qreal scale)
 {
+    Q_UNUSED(mask); Q_UNUSED(nbFrames); Q_UNUSED(scale);
     /*const int nbSteps = 30;
     if (!pathIsValid_)
     {

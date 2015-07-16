@@ -68,6 +68,7 @@ using namespace std ;
 
 void vrender::VectorialRender(RenderCB render_callback, void *callback_params, VRenderParams& vparams)
 {
+    Q_UNUSED(render_callback); Q_UNUSED(callback_params); Q_UNUSED(vparams);
     /*GLfloat *feedbackBuffer = NULL ;
     SortMethod *sort_method = NULL ;
     Exporter *exporter = NULL ;

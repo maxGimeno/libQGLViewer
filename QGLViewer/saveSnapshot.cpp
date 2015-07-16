@@ -310,6 +310,8 @@ public: ImageInterface(QWidget *parent) : QDialog(parent) { setupUi(this); }
 // Returns false in case of problem.
 bool QGLViewer::saveImageSnapshot(const QString& fileName)
 {
+    Q_UNUSED(fileName);
+    return true;
 /*	static ImageInterface* imageInterface = NULL;
 
     if (!imageInterface)
