@@ -293,49 +293,49 @@ mouse page</a> for details.
   */
  bool ManipulatedFrame::event(QEvent *e,  Camera* const camera)
 {
+     //keeps the mouseMoveEvent from interfering
+     action_ = QGLViewer::NO_MOUSE_ACTION;
      QTouchEvent* te = (static_cast<QTouchEvent*>(e));
      QTouchEvent::TouchPoint p0 = te->touchPoints().first();
      QTouchEvent::TouchPoint p1 = te->touchPoints().last();
-     if(prevPos_ != QPoint(p1.pos().x(), p1.pos().y()))
-     {
-         prevPos_ = pressPos_ = QPoint(p1.pos().x(), p1.pos().y());
-         QLineF line1(p0.lastPos(), p1.lastPos());
-         QLineF line2(p0.pos(), p1.pos());
-         qreal scaling =line1.length()-line2.length();
-         QPointF c1(line1.x1()/2.0+line1.x2()/2.0, line1.y1()/2.0+line1.y2()/2.0);
-         QPointF c2(line2.x1()/2.0+line2.x2()/2.0, line2.y1()/2.0+line2.y2()/2.0);
-         QVector2D translation(c2-c1);
+     prevPos_ = pressPos_ = QPoint(p1.pos().x(), p1.pos().y());
+     QLineF line1(p0.lastPos(), p1.lastPos());
+     QLineF line2(p0.pos(), p1.pos());
+     qreal scaling =line1.length()-line2.length();
+     QPointF c1(line1.x1()/2.0+line1.x2()/2.0, line1.y1()/2.0+line1.y2()/2.0);
+     QPointF c2(line2.x1()/2.0+line2.x2()/2.0, line2.y1()/2.0+line2.y2()/2.0);
+     QVector2D translation(c2-c1);
 
-         //Performs  a translation along the X and Y axis
-         Vec trans(-translation.x(), translation.y(), 0);
-         // Scale to fit the screen mouse displacement
-         trans *= 2.0 * tan(camera->fieldOfView()/2.0) * fabs((camera->frame()->coordinatesOf(position())).z) / camera->screenHeight();
-         // Transform to world coordinate system.
-         trans = camera->frame()->orientation().rotate(translationSensitivity()*trans);
-         // And then down to frame
-         if (referenceFrame())
-             trans = referenceFrame()->transformOf(trans);
-         translate(-trans);
+     //Performs  a translation along the X and Y axis
+     Vec trans(-translation.x(), translation.y(), 0);
+     // Scale to fit the screen mouse displacement
+     trans *= 2.0 * tan(camera->fieldOfView()/2.0) * fabs((camera->frame()->coordinatesOf(position())).z) / camera->screenHeight();
+     // Transform to world coordinate system.
+     trans = camera->frame()->orientation().rotate(translationSensitivity()*trans);
+     // And then down to frame
+     if (referenceFrame())
+         trans = referenceFrame()->transformOf(trans);
+     translate(-trans);
 
-         //Performs a translation along the Z axis as a zoom action
-         translate(inverseTransformOf(Vec(0.0, 0.0, 0.2*camera->flySpeed()*2*scaling)));
+     //Performs a translation along the Z axis as a zoom action
+     translate(inverseTransformOf(Vec(0.0, 0.0, 0.2*camera->flySpeed()*2*scaling)));
 
-         //the pivot point position in the screen coordinate system
-         Vec pivot = Vec(line1.x1()/2.0+line1.x2()/2.0,line1.y1()/2.0+line1.y2()/2.0,camera->zNear());
-         //the pivot point position in the World coordinate system
-         pivot = camera->unprojectedCoordinatesOf(pivot);
+     //the pivot point position in the screen coordinate system
+     Vec pivot = Vec(line1.x1()/2.0+line1.x2()/2.0,line1.y1()/2.0+line1.y2()/2.0,camera->zNear());
+     //the pivot point position in the World coordinate system
+     pivot = camera->unprojectedCoordinatesOf(pivot);
 
 
-         Vec U= camera->frame()->transformOf(camera->frame()->inverseTransformOf(Vec(0.0, 0.0, -1.0)));
+     Vec U= camera->frame()->transformOf(camera->frame()->inverseTransformOf(Vec(0.0, 0.0, -1.0)));
 
-         qreal angle = line2.angleTo(line1)*M_PI/180;
-         qglviewer::Quaternion quaternion;
-         quaternion = Quaternion(U, -2*angle);
+     qreal angle = line2.angleTo(line1)*M_PI/180;
+     qglviewer::Quaternion quaternion;
+     quaternion = Quaternion(U, -2*angle);
 
-         //Performs a rotation around the Z axis and around the pivot point
-         rotateAroundPoint(quaternion, camera->pivotPoint());
-         Q_EMIT manipulated();
-     }
+     //Performs a rotation around the Z axis and around the pivot point
+     rotateAroundPoint(quaternion, camera->pivotPoint());
+     Q_EMIT manipulated();
+
 
      return true;
 }
