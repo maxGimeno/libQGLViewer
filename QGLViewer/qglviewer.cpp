@@ -1235,6 +1235,8 @@ void QGLViewer::endSelection()
 {
     fbo->release();
     delete fbo;
+
+
 }
 
 /*! Sets the selectBufferSize().
@@ -3616,12 +3618,10 @@ void QGLViewer::drawArrowGLES(float R, int prec, qglviewer::Vec from, qglviewer:
         data.colors->push_back(color.z);
 
         //point B1
-      //  qDebug()<<"p = "<<p;
         p = QVector4D(R*2.0* sin(D),0.66,R *2.0* cos(D), 1.0);
         n = QVector4D(sin(D), sin(a), cos(D), 1.0);
         pR = mat*p;
         nR = mat*n;
-//qDebug()<<"pR = "<<pR;
         data.vertices->push_back(pR.x());
         data.vertices->push_back(pR.y());
         data.vertices->push_back(pR.z());
