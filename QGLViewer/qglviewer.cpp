@@ -264,7 +264,7 @@ void QGLViewer::initializeGL()
     //Vertex source code
     const char vertex_source[] =
     {
-        // "#version 330 \n"
+        "#version 100 \n"
         "attribute highp vec4 vertex;\n"
         "attribute highp vec3 normal;\n"
         "attribute highp vec3 colors;\n"
@@ -280,35 +280,37 @@ void QGLViewer::initializeGL()
         "   fP = mv_matrix * vertex; \n"
         "   fN = mat3(mv_matrix)* normal; \n"
         "   gl_Position = mvp_matrix * vertex; \n"
-        "}"
+        "} \n"
+        "\n"
     };
     //Fragment source code
     const char fragment_source[] =
     {
-        //"#version 330 \n"
-        "varying highp vec4 color; \n"
-        "varying highp vec4 fP; \n"
-        "varying highp vec3 fN; \n"
-        "uniform highp vec4 light_pos;  \n"
-        "uniform highp vec4 light_diff; \n"
-        "uniform highp vec4 light_spec; \n"
-        "uniform highp vec4 light_amb;  \n"
-        "uniform highp float spec_power ; \n"
+        "#version 100 \n"
+        "precision highp float; \n"
+        "varying vec4 color; \n"
+        "varying vec4 fP; \n"
+        "varying vec3 fN; \n"
+        "uniform vec4 light_pos;  \n"
+        "uniform vec4 light_diff; \n"
+        "uniform vec4 light_spec; \n"
+        "uniform vec4 light_amb;  \n"
+        "uniform float spec_power ; \n"
 
         "void main(void) { \n"
 
-        "   highp vec3 L = light_pos.xyz - fP.xyz; \n"
-        "   highp vec3 V = -fP.xyz; \n"
-        "   highp vec3 N; \n"
-        "   if(fN == highp vec3(0.0,0.0,0.0)) \n"
-        "       N = highp vec3(0.0,0.0,0.0); \n"
+        "   vec3 L = light_pos.xyz - fP.xyz; \n"
+        "   vec3 V = -fP.xyz; \n"
+        "   vec3 N; \n"
+        "   if(fN == vec3(0.0,0.0,0.0)) \n"
+        "       N = vec3(0.0,0.0,0.0); \n"
         "   else \n"
         "       N = normalize(fN); \n"
         "   L = normalize(L); \n"
         "   V = normalize(V); \n"
-        "   highp vec3 R = reflect(-L, N); \n"
-        "   highp vec4 diffuse = max(abs(dot(N,L)),0.0) * light_diff*color; \n"
-        "   highp vec4 specular = pow(max(dot(R,V), 0.0), spec_power) * light_spec; \n"
+        "   vec3 R = reflect(-L, N); \n"
+        "   vec4 diffuse = max(abs(dot(N,L)),0.0) * light_diff*color; \n"
+        "   vec4 specular = pow(max(dot(R,V), 0.0), spec_power) * light_spec; \n"
 
         "gl_FragColor = color*light_amb + diffuse + specular; \n"
         "} \n"
@@ -1331,7 +1333,7 @@ bool QGLViewer::event(QEvent *e)
             QTouchEvent* te = (static_cast<QTouchEvent*>(e));
             select(te->touchPoints().first().pos().toPoint());
         }
-        else if(frame_manipulation)
+        else if(frame_manipulation && manipulatedFrame())
             manipulatedFrame_->touchBeginEvent(e, camera());
         else
             camera_->frame()->touchBeginEvent(e, camera());
@@ -1342,7 +1344,7 @@ bool QGLViewer::event(QEvent *e)
         QTouchEvent* te = (static_cast<QTouchEvent*>(e));
         if(te->touchPoints().count()==2 )
         {
-            if(frame_manipulation)
+            if(frame_manipulation && manipulatedFrame())
                 manipulatedFrame_->event(e, camera());
             else
                 camera_->frame()->event(e, camera());
@@ -1354,7 +1356,7 @@ bool QGLViewer::event(QEvent *e)
         QMouseEvent* me = (static_cast<QMouseEvent*>(e));
         mouseReleaseEvent(me);
 
-        if(frame_manipulation)
+        if(frame_manipulation && manipulatedFrame())
             manipulatedFrame_->touchEndEvent(e, camera());
         else
             camera_->frame()->touchEndEvent(e, camera());
@@ -3262,7 +3264,6 @@ void QGLViewer::setManipulatedFrame(ManipulatedFrame* frame)
     if (manipulatedFrame())
     {
         manipulatedFrame()->stopSpinning();
-
         if (manipulatedFrame() != camera()->frame())
         {
             disconnect(manipulatedFrame(), SIGNAL(manipulated()), this, SLOT(update()));
@@ -3271,10 +3272,8 @@ void QGLViewer::setManipulatedFrame(ManipulatedFrame* frame)
     }
 
     manipulatedFrame_ = frame;
-
     manipulatedFrameIsACamera_ = ((manipulatedFrame() != camera()->frame()) &&
                                   (dynamic_cast<ManipulatedCameraFrame*>(manipulatedFrame()) != NULL));
-
     if (manipulatedFrame())
     {
         // Prevent multiple connections, that would result in useless display updates

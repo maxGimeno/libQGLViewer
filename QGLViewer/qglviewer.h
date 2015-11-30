@@ -55,12 +55,12 @@ class QGLVIEWER_EXPORT QGLViewer : public QOpenGLWidget
 	Q_OBJECT
 
 public:
-	// Complete implementation is provided so that the constructor is defined with QT3_SUPPORT when .h is included.
-	// (Would not be available otherwise since lib is compiled without QT3_SUPPORT).
+    // Complete implementation is provided so that the constructor is defined with QT3_SUPPORT when .h is included.
+    // (Would not be available otherwise since lib is compiled without QT3_SUPPORT).
 #ifdef QT3_SUPPORT
     explicit QGLViewer(QWidget* parent=NULL, const char* name=0, Qt::WindowFlags flags=0)
         : QOpenGLWidget(parent, name, shareWidget, flags)
-	{ defaultConstructor(); }
+    { defaultConstructor(); }
 
 #else
 
@@ -273,7 +273,7 @@ public:
 	implementation.
 
 	Default value is \c NULL, meaning that no qglviewer::ManipulatedFrame is set. */
-	qglviewer::ManipulatedFrame* manipulatedFrame() const { return manipulatedFrame_; }
+    qglviewer::ManipulatedFrame* manipulatedFrame() const { return manipulatedFrame_; }
 
 public Q_SLOTS:
 	void setCamera(qglviewer::Camera* const camera);
@@ -1144,7 +1144,7 @@ private:
     };
 	// Copy constructor and operator= are declared private and undefined
 	// Prevents everyone from trying to use them
-	QGLViewer(const QGLViewer& v);
+    QGLViewer(const QGLViewer& v);
 	QGLViewer& operator=(const QGLViewer& v);
     QOpenGLFramebufferObject *fbo ;
 	// Set parameters to their default values. Called by the constructors.
